@@ -109,6 +109,10 @@ dialog form,.dlg{padding:22px 24px;display:flex;flex-direction:column;gap:14px}
     <a href="#ped-trimestral">Pedido Hanseníase</a>
     <a href="#ped-tb">Pedido Tuberculose</a>
     <a href="#ped-analise" class="soReg">Análise de pedidos</a>
+    <div class="sec">Toxoplasmose</div>
+    <a href="#toxo-pacientes">Pacientes</a>
+    <a href="#toxo-dispensacoes">Dispensações</a>
+    <a href="#toxo-estoque">Estoque e prestação</a>
     <div class="sec">SINAN</div>
     <a href="#sinan-mh">Hanseníase</a>
     <a href="#sinan-tb">Tuberculose</a>
@@ -163,8 +167,9 @@ function parseD(v) {
 function toast(msg) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.append(t); setTimeout(() => t.remove(), 4200); }
 
 /* ======================= DADOS ======================= */
-const TABELAS = ['tali_pacientes', 'tali_dispensacoes', 'pedidos', 'sinan_casos', 'avisos'];
-let perfil = null, D = {tali_pacientes:[], tali_dispensacoes:[], pedidos:[], sinan_casos:[], avisos:[]}, MEM = null, seq = 1000;
+const TABELAS = ['tali_pacientes', 'tali_dispensacoes', 'pedidos', 'sinan_casos', 'avisos', 'toxo_pacientes', 'toxo_dispensacoes', 'toxo_estoque'];
+let perfil = null, D = {}, MEM = null, seq = 1000;
+TABELAS.forEach(t => D[t] = []);
 const isReg = () => perfil === 'REGIONAL';
 const visivel = r => isReg() || !r.municipio || r.municipio === perfil;   // aviso sem município = para todos
 
@@ -188,7 +193,7 @@ const db = {
   },
   async del(t, ids) {
     ids = [].concat(ids); if (!ids.length) return;
-    if (DEMO) { MEM[t] = MEM[t].filter(r => !ids.includes(r.id)); if (t === 'tali_pacientes') MEM.tali_dispensacoes = MEM.tali_dispensacoes.filter(r => !ids.includes(r.paciente_id)); return; }
+    if (DEMO) { MEM[t] = MEM[t].filter(r => !ids.includes(r.id)); const filho = { tali_pacientes: 'tali_dispensacoes', toxo_pacientes: 'toxo_dispensacoes' }[t]; if (filho) MEM[filho] = MEM[filho].filter(r => !ids.includes(r.paciente_id)); return; }
     const { error } = await sb.from(t).delete().in('id', ids); if (error) throw error;
   }
 };
@@ -255,6 +260,7 @@ const munSelect = (id, val) => isReg()
 const ROTAS = {
   'inicio': ['Início', vInicio], 'tali-pacientes': ['Talidomida · Pacientes', vPacientes], 'tali-dispensacoes': ['Talidomida · Dispensações', vDisp],
   'ped-trimestral': ['Pedido Hanseníase', vTrimestral], 'ped-tb': ['Pedido Tuberculose', vTrimestralTB], 'ped-analise': ['Análise de pedidos', vAnalise],
+  'toxo-pacientes': ['Toxoplasmose · Pacientes', vToxoPac], 'toxo-dispensacoes': ['Toxoplasmose · Dispensações', vToxoDisp], 'toxo-estoque': ['Toxoplasmose · Estoque e prestação de contas', vToxoEst],
   'sinan-mh': ['SINAN · Hanseníase', () => vSinan('MH')], 'sinan-tb': ['SINAN · Tuberculose', () => vSinan('TB')]
 };
 function render() {
@@ -277,12 +283,16 @@ function vInicio() {
     const pm = casos.filter(c => c.agravo === 'MH' && c.situacao !== 'resolvido').length;
     const pt = casos.filter(c => c.agravo === 'TB' && c.situacao !== 'resolvido').length;
     const obs = casos.filter(c => c.situacao === (isReg() ? 'corrigido' : 'pendente')).length;
+    const tx = D.toxo_pacientes.filter(p => p.municipio === m && p.ativo).length;
+    const est = D.toxo_estoque.some(e => e.municipio === m && e.periodo === triOf(hojeISO()));
     return `<div class="kpi"><h3>${m}</h3>
       <div class="l"><a href="#tali-pacientes">Talidomida: pacientes ativos</a><b>${pac}</b></div>
       <div class="l"><a href="#tali-dispensacoes">Dispensações em ${MESES[+mes.slice(5) - 1]}</a><b>${disp}</b></div>
       <div class="l"><a href="#${isReg() ? 'ped-analise' : 'ped-trimestral'}">Pedidos em aberto</a><b>${ped}</b></div>
       <div class="l"><a href="#sinan-mh">MH: pendências em aberto</a><b>${pm}</b></div>
       <div class="l"><a href="#sinan-tb">TB: pendências em aberto</a><b>${pt}</b></div>
+      <div class="l"><a href="#toxo-pacientes">Toxoplasmose: em tratamento</a><b>${tx}</b></div>
+      <div class="l"><a href="#toxo-estoque">Prestação toxo (${triOf(hojeISO()).slice(6)}º tri)</a>${est ? '<span class="chip c-ok">Enviada</span>' : '<span class="chip c-warn">Pendente</span>'}</div>
       ${obs ? `<span class="chip ${isReg() ? 'c-info' : 'c-bad'}">${obs} ${isReg() ? 'corrigida(s) pelo município, para conferir' : 'pendência(s) para corrigir'}</span>` : ''}</div>`;
   };
   return `<div class="inicio"><div style="display:flex;flex-direction:column;gap:14px"><div class="sub">${isReg() ? 'Resumo por município. Use o filtro no topo para ver um município só.' : 'Resumo do seu município.'}</div>
@@ -337,6 +347,9 @@ document.addEventListener('change', e => {
   if (e.target.id === 'filtroSit') { filtroSit = e.target.value; render(); }
   if (e.target.id === 'bEsq') { const mun = $('bMun').value, ref = $('bRef').value, mod = $('bMod').value; esqTB = e.target.value; render(); $('bMun').value = mun; $('bRef').value = ref; $('bMod').value = mod; }
   if (e.target.id === 'impTali') importarTali(e.target.files[0]);
+  if (e.target.id === 'verRetToxo') { verRetToxo = e.target.value === '1'; render(); }
+  if (e.target.id === 'triToxo') { triToxo = e.target.value; render(); }
+  if (e.target.id === 'tp_condicao') { const c = e.target.value, cid = $('tp_cid'); if (c === '1') cid.value = 'O98.6'; else if (c === '3') cid.value = 'B58.0'; else if (['O98.6', 'B58.0'].includes(cid.value)) cid.value = ''; }
 });
 document.addEventListener('input', e => {
   if (e.target.id === 'busca') { busca = e.target.value; clearTimeout(window._bt); window._bt = setTimeout(() => { render(); const b = $('busca'); b.focus(); b.setSelectionRange(b.value.length, b.value.length); }, 300); }
@@ -578,6 +591,7 @@ document.addEventListener('submit', async e => {
   if (e.target.id === 'fTri') { e.preventDefault(); const it = {}; CATS.forEach(([k]) => it[k] = Math.max(0, +$('t_' + k).value || 0));
     if (!Object.values(it).some(v => v)) { toast('Informe ao menos um paciente.'); return; }
     await salvar(() => db.insert('pedidos', { municipio: $('tMun').value, tipo: 'trimestral', modalidade: $('tMod').value, referencia: $('tRef').value, agravo: 'MH', itens: it, status: 'aberto' }), 'Pedido enviado à regional.'); }
+  if (e.target.id === 'fTE') { e.preventDefault(); await salvarEstoque(); }
   if (e.target.id === 'fTB') { e.preventDefault(); const r = lerTB();
     if (!Object.values(r.n).some(v => v)) { toast('Informe ao menos um paciente.'); return; }
     await salvar(() => db.insert('pedidos', { municipio: $('bMun').value, tipo: 'trimestral_tb', modalidade: $('bMod').value, referencia: $('bRef').value, agravo: 'TB', itens: { esquema: esqTB, ...r }, status: 'aberto' }), 'Pedido de TB enviado à regional.'); }
@@ -724,6 +738,199 @@ function formCaso(ag, c) {
       : db.insert('sinan_casos', { agravo: ag, municipio: mun, nnotif: dd.nnotif, dados: dd, obs_regional: $('csObs').value.trim(), situacao: 'pendente' }), c ? 'Caso atualizado.' : 'Caso incluído e apontamento enviado ao município.');
     if (ok) { $('dlg').close(); if (c) abrirCaso(D.sinan_casos.find(x => x.id === c.id)); } };
 }
+/* ======================= TOXOPLASMOSE ======================= */
+const IMG_PA = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAQDAwMDAgQDAwMEBAQFBgoGBgUFBgwICQcKDgwPDg4MDQ0PERYTDxAVEQ0NExoTFRcYGRkZDxIbHRsYHRYYGRj/2wBDAQQEBAYFBgsGBgsYEA0QGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBj/wAARCACgAKADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD7+ooooAKKKKACikZgiFznAGTiuKg+LHga602K/ttWMtvIu5WWF/fORjIIKsCOxBB5rlxWOw+ESeImo37uxUYOWyO2rgX+LPh+LxpqXhyW3uvNspEj85AGWTcjHIHXhkZPqPeqPiX4o6XNoNxa+H7ic3silRJ5RHljnLLnqwAYgd8e4rwLU5ZNN8Qafq0RWP5xaSnPygOwMZz6CRVwf7v1r4XiDjL2VSOHy2ScrXb3Xkjqo4a6vM+nbT4leDLu3E39sxwrt3fv1ZOOPUe4/OuA8afFue4aTTvDJeCIEh7xhh2wQCFHYcjk815rO0YmnRFIhJ85F/2GAYj8NqD8ay55GTejn5lG1vqM5/8AQRXymL41zHGUfY6Qvu1o3/kdEcNCLudF8LviJrPhnQ7eEM17Yl5AbWVuh8w/dPY9fbmvdYfij4Lm05Ln+1ArtjNuUPmKT0yAK+TvDFxt8Pgjqk8hH1Ekp/8AZa3YSAZCG2gnYG9B0B/DZn8aMLxVj8tlUpQfNG7spa216BLDwnZs9v8AEnxy0jSdFa90rSLrUZWYRQROwhEzttCgHk8l0HTv7V6bpt/bappNvqNpIskE6CRGXoQa+O7qT+0vGVrYBG8nTYhcTIv/AD2kyI0+oBk/FUr1/wCHfju18PWs+m6vI5tGPmRSRruwxxkYHY5BHoGUV7+ScaVXiVTzGS5Zq97WUe33r80Y1cMuW8D2+iuMj+KXhGVtqXdwSRkAQNz0xjjvkAfWtrw14p0bxbps+oaHcNcWsNw9qZdhCs6HDbSfvAHjI4yDX6Dhc0wmLlyUKqk/JnJKEo7o2aKKK7yAooooAKKKKACiiuU8Q/ELw54eurmwluhc6jbIry2UBBkjVhlWYH7qn+8eK58Vi6OEpOtXlyxXVlRi5OyLnjTUG07wVfSx5MkkZiQAbjluOgIJ4yeOfSvl3UkfQ76XWINz6fOd99Ch3bCR/wAfCkcngDfj7wUP95GB7Xxn8RNW1+aG2Wwf7PuMkaRIzLGVHViPmLYOQAAQR3HNcsHjumDaoNUnLtgCOLy42Y85CxnPzYB5OCRxzX4fxTnscxxqq0rukla3fu7fl6Hr4TCvls2kxEm2ujRSccPHImDnpgjHHYexwvYc1dbs4dQ0ma2dQsFxGyELwFyBnB9B8uPQbPeqt2PBWmSadJJpV3a20T+WirbN5J3rtVXU54zjHHBAqeEeE59XkPnzxwyoqLbSrJFFE4JO4EkBWIIH4CvmU+S1RRl327P1+Z3fVU9FNFLSNVa70i0u7rm4hZrW6HT50JY/nh/0qvqrGC5liZuSnP4cE/8Ajp/OtGHwZc20mrXOn6oXM8yzW8LAOrbVXG49dxKkbgen41U1Hw74lv8AT7a5FpaLKIR5lus53qSM7eVAyDkda3jWw7q80ZJLz031M5YStHocz4ausaXJgZIvZxj/ALbMR/UfjXTC7tbRt13MiQwxmSTe2PlAyf0A/M1zXgzQtVlmuE1O1ubNYb6QNGRseV2csqKewx8xbsK7YaLbwyus6QRRwzqs8dvCoHlMvysWYFjz1JPY105hVoxryTd+ug6GDnON3oZPhTzLjT21K6IN1qMjXswzg4fG1fY7dg9jW8Zt7nkPk+nDfh6cnj0OD2qqfDunRTJHcIwMW8TkKp3IfuS4I+6OAfxqsdNt9PMPmX9vaSbCGaU7B5ueDlSPkYdDgiuOpVp15uSe/kavAyityzeXE99eNoVhPJGcZv7tDhokYf6tG6iVw3XqisT95wK9r+C95Bb2l5oEKrFFEqSQRIMKqgbcADoBheB+vU/PlhqMOi2UcEYFxE5eSQh977yfmZ5CBuyxPzMMHPU9D13h34iWOhXx1HTbnEwVlkLKshI4JyobP0X15Y9q9nJ8dLLcdTrpP2cd7bu+jf8Akjhr0JOLi9z6torz/RvixoV3bltZ26WVTzHmkfMKpjO8ucbV9zgE9Ca7yCeG5tY7m3kWWGVQ6OpyGUjII9sV+45dmmFzGn7XDT5l+K9UePOEoO0kSUUUV6BAUUUUAFeC/GTT7O+8fwG4iYXEVsrW9zA3lXEHLZMci/OPcEMp7gV7ySFBJIAHc18+/EzXdL1fxkZLG4E0EcSxGUDMbsCT8rcg9eu0/UV8Px7WUMuUVK0nJW7+Z1YRXmeePcajpihrvOoWuMi9tYgJVAOcywpkEDrvhyB1KL1q9a6tbXtuk0c8UkUoJjmjYPHID1IIyD7+/UZ+YEhdgzqWbB3MVOSMdzySPqfyrAvbGNppbyyl+xXUh3SvGoaOc+ssecP/AL3Df7Q6V+PxVOt8Xuvv0+a6fL7j0dUdHqENvqdlLZ30ayLKpVw/IcEd/r69/rhjw9u2pab4lh8PXOZppSVtZ5jxNGOokJ/iQZzn7w981Zh8TS6fMlnq8AjVjtVg+6Nj/wBM5DjBP9x8H6nmrGuWWm+JdAa2uJdyA/ubtB88Eg6ZB6Eeh/UV0UacsO+SqvcfXe3mv1QJp6l+y8H6TrN9c3N3DMq284FvcW16EMu0cvsj4Rc9ASSeprpoNKuLW0EC63qUsSA/6wo8hHpu25/rXkfgqfWovGMnhN7C5GrKpaGWyiyWGOJB22H0PAIwa9ostG8dab4Wk1HxTb6O8kILyJYzMHCD+IgjbnHOAa83Oo1MPNQnVVnaydtb9Ve+562ExNKStazMi7nXSdKl1SS0uE8qNo7S1iiaaQu38TBc5YnGfQA5PJrHk16e1kiiktnS8CHdcXDhsg4LCZFX5ASeFByPbmusW5kNzeWrskbxKHSQHA2sDgn6EHP0rL1LWNF8P+Frc+IbmeytwscZkeKZA78dGAGcnnrzXLh6ifuum5Nvp28v61OuorbSscFd+Kr3ykuEmZEaXZY2VsxUuxHCqzZZVI5bsF7dK2fDWhNBaCa9YTXEhLSzsCck5O1c8qg5AUdh9SIbyw8PL4mXW7JbVYxHgIZJF3qxBzh1CxnJyecN8uelGqeL7SzkFoxeKVhhLdULTS/7iD7w469OOTxx78r1YKnhoNX3019Pl1PErc6l78ro61ruOBRHEcnI6Hv+Hfnr74GM7jjz67F9vaw021bU9QX5Gt4CAsOOcSPghMddoDN/sg/NWLa22ta2C1+8um2ZGTa28n751/6ayjhAfRf++jXUWFhaafZx2drbxQQYwkMSAAj2GDkfQP8AhXG6VKh8XvS7dPm+vovvMbtkVnocmpXdvceI7qO+zOpjtkwlpG+RyA2Q7/7TeY/oF6V9doAsSqBgAAV8v2F2lvqsN2Q0nkyKz7CQ20HJXIyw6dCUHtX0doGvad4j0WPUdNmDxt8rLkEo3dTgkZHtX6N4d4qMp14Tl7ztZeSveyOLGR0TRqUUUV+pnCFFFFAHkPxo1fxvYLb2ek2tjJo10u2RhcSQzlxncp/dOu3GCOQeteFy6nexyE3Gg3qNjlreaKQn8Q+4/itfVfxA0a31rwHewztGjQL9ojkchQjLz1IOOMjOO9fNEk0Xl7TcMF/ui44/Va/HOOKcqWYKVRc0ZK61enluelhXeGhzlz4hsbUhrg3dltPytdWksSg+zbcfliol8U6fc5xd2V53ysqsx/FSDmtqVlUM6TKo6lxKg/MjFYNzpsOtXDwQafDq06DJSOFLmRR/QZ9xXzOGo068uWMHfy1/T9TodyG8n0q+heE3IiLjaYrldyN7ZAz+YP1rmDZeKtG1KKTw1G97FK6wrbq4lRtxAVc84GSOG4HbFbtn8K5de12TR47WHR7hIzIUmaSI8EfLtRiAcHPYfWn+AfBmoeEPjGNR12a6ez0aO4u5ojNuRikLOoAOSSevJ6170sDPCYOeIWsVf3ZLd9t9NdCbNtXPpLwf4Ut/DOionlRvqEqg3U6jOW67FJ5CA8AfjWX4t8cRaba32naZoja3eqjxNa/aYoFJ2EsGLnO0DOSAa8k0d/FHxG16413xJ4q1HRtOt5CUgspWjjTnbtG0jCg8FjzweeRXZW0uuTaZqmm6zqdrNaCyjuYDqn73yN/mLgykKw/1YYZzwcHNeBhvDTFxrxxuPtVvZuKk4tejtrbtp6nZCrzLlirHF6Tr2tacPC8PiTwffbRG0evX63UEouSqLJHj5hjG7lcA7dwGea+hJItL8S+HdsscV9p12mQGXKsOx56EH8iK8xOoS2ul63q2jQ6ZZ3MNpE8aGBXlQmINu28BVy+S2CSF9hWF4k8O+IZluNV0/wAZatb69YNzaLdySRzqCAHI+UJuJGAAB255r1M98PquZYjmwa9ioXs3JvmvrslpZ6b7dA55QWupyPxB8P8AjKz+IF1oj31vb6TGqzxahOw+aJs4+T+JwQQSeMjpzUOhWHh7R3CWCy6lf3DBTJ/HM5IAGT7kY6gegpPGN7rHxR+GuiXxuhaa5pl49rNdBQDNC0e9WIxgHMbA+4OODTvCfw91LwqdF8fX1+93FaXcUklq8hyRux8nZsA5O7GOgPFVh8txc8HOlUsqlJNSjHq11v8A3t/0OTeWmx6LrP8Awi/heBLHXNRvrnVgoaS10yVI0tie29sAH34J9BmuKufEL6Rf7dSWeK0uQJIEuIme4Zckb2CoBImeAePcmuzgg8CeGtX1fxreaAmsape30t/aajcW7qqROFK7nlULEV6ZGTgAisHWL681+e+vdRngluLmEkokkZCLtO1VGSQB2/PvXzWFozpO1anLlaV3L3dX/KtbJd2aSRXXxGZinkaPqU+OF8yJY1H0ErLj8DXZeAda8fR+MrNNE0i3h+0uI5ft94zKUH94Rxv0GSPnAz3rCsTf/ZIxMt3DMEUSosoTDYBPReRzn8a9f+DehBru91+4VvMj/wBHiEjbiMgFjyo9h3717nD1P6xmVKlQSTve93st+phWdoNs9fooor99PJCiiigDzz4t68NP8LppEM6Rz3zYbLqCIx1OCynk4HFfL/jjX7/wzNpmrR6r5VtE7LcQ+eyeYjY5wWI4wcHsSK+mviP8L4vF9z/bEGo6kLyOMRi0+2zR27KM9EjZfmOeucetfIF1F4U8L+Pr1NWeW6ure4YtDGoeO3YHGxlZmLlf97APrX5XxHgK1TNJV8RFyil7qSumu1+j+QsXiVSoRjGSjdrVu1vPz9DoYfH2lzeLJrK7v2vLBNphe3aScSsUDFSFXJI57HGc4+Wruo+LpbTURL4X0S8jZETNybLY3mZJIUysCqbdi4xgkE4rlLHTzrPj2WfTrhXtLYrc21xFjyjFkDy8k4HLH1I6YORVfxfqtzJcJbWWoLFbxzmG6ddwKZUEOMDJQ/N93rtrmwmNlh4wwWDSjdXb6r7v66FxzGdKhUrVlom+Xu18/wCran0l4evrHxJo2n+JTYxx3hiKEsAXgbo8e70yK5/xP4Z0i/8AHUesXHiK1sWNkbO6spkVhcRknkksCvBI9+PSvL7Dx1qHw406PwhoFqt9JIVuhcXm5i5lH3UQNnkgnk9xxXuHw90v/hIPiBJD4vsLea6OlxzzwLkJHKdmcDPYEj86+4wUaWY0I8yvFq51QzSlVcqcV70LX7JvpfZlO6m8OQaQY9D1DTLC4gR/swglSNATztIHGCQM8e9cbqeq6Hc2c8MZVb+9DrdXd1cCSTcFwFUgHYuMjIUenevpJ/h34KkjZG8PWuGBB5Yf1r4r+M3gfxH8MvHj2kerarJot4TLp9w13Ifl7xsd33lz+Iwa7cX/ALLDnabR9Dw/gf7ZxDw0ZqEraXvr3t5ne2+uWs2rSz699mvI544oJYpEEOVCclc/dxlhuyNwA45wOn0LUtLuJG8/VWTS7fYtpBdXIkZiueWOMkD5cZJ6ZzXyp/a+rnrq+on/ALepP/iqQ6pqh66rf/8AgTJ/jXmPNaX8rPtf+IdYz/n9H8T6W8T+FfCetTySWfiHTdIhm+adIYFPmPhhvzkAHDnnFejLY2g0+Ow+zxNbIqosTqGXA6cGvjjwxqGoSeMLFJNQvHRmcFXndgR5bcEE819b+JNTg0fwPqOpXE4gWG0chz2YrhcDuckYHetMN7GSlVpxs29fM+UzzJ55NX9jWknpe62tr39DyHxv8Vi99qUVp9rjtLNXjhSSx8yG5YceYWPAGcgHoBzQfFHhnxAsWnaCY7W6mcRQWTERypuwu0gnLdSMjII54wK5LVPEuj2EVgmiyreW+11ntgCHKKoAwkmMZz9OCM1pfCxI013UPF00WnaRptpHF9i+27zCbptwjHTO3BJLD7uPSvi8dm2JWBr1KsGubSN++1rb/mfFQzWFfGRoUJqStr5dU01pboez+P8ARrLT307UY1jDSbbKUMud4VCVbqOQFI+hHpWl8J9attM8WnT1kTyb9dnyBtvmDkHoR0yM7q4jxHq914qTSNG8QRW8WpQW7anPb6fLLtiDsUjIdGyflDHO4Ah19a6PwZ8HdX1S4h1WbWta0i3iZJIWadZ3kIIYELMj4X/a3/h3r47g3B42nWo+zu6kXd6XVr9+1j18ROEk+x9F0UDgUV/Rh4wUUUUAc/4z11dA8H3d79i1e7dkMappFsZ7hSQcMq9sep4r4l8a+LdJ1afStJ0XwsfBsNiDEZJ/3k1yWI+a4+TcxyCc/Nyxr2j4k/C698F+Jn8feGfiYnhu3MvmeTqt1MVRyclI8bjIp5/dlT+XThvHHxR8Q6lbWHiaXw8FtnAsx4iSFxZuV++8QYCQ85+X5OQcM1fN8RVK31flp0+Z320+/r+R49SpKtVcKsvZqO+zuvJrVHP6b9vnt7xNavoLLVbKIgXv3MwSD7zD5cAEYBwBwMY78zp88er+Pvsz6fBEbuIwSrkrbSQggGdQw3HCqCAM7sdR36bwj4cGt6R/wl+pXFvqF7NcNLCX3Sx5C42LGCctxkbRxx81WdE8D3trrl7q9xqdle6g1lLfCVT/AKOuMEo75B3joQeAPrX59ldKFTEVYpXasmlprfVLy0Z7aozqwocsW4p3d2trde7/AKZt6j4L1vS4jq3gbWYU1G1hjLaV5Eck6xgHH7w5JbB5Xgc4GOM63gf4xWWkfEXSdY8Q2wtI9TRtLv2YFPssyiM7sHopIGc9A3tVvQ9QuX1y0W0WV5m850guQ0a72jAyGdV+XjJChiepNeW/GrUE1S50254MmSk+EKjzBEgYDPUZzgjII71+jyl9WpudNWsj6HJcmp43M4UpyfJU0a6Xs7Ndn+B97qyugdGDKRkEHOa5b4h+BNJ+IngS78OaqoUuN9vcBctbygfK6/T07gkV4t+zN8X/AO19Pj+HniO7LahbJ/xLp5W5niH/ACzJP8S9vUfSvo+eeG2tpLieRY4o1Ls7HAAAyTXqUKtPF0rrVPdHJmOAxWR450pO04O6a69mv68j8y/E/hvVfCHi298Oa3B5N7aSbHHZx2dT3UjkGsmvtL4t+A9K+Nvwm07x94OVZNVW0+02ZGA11CeTE3+0OcehyO9fFzK8cjRyIyOpKsrDBUjggj1r5DMMDLCVXF7dD9/4U4jp53g1U2qR0kvPuvJmv4U/5HTT/wDff/0W1fXOv6FoGvaHCniSITWUI8zZJKUQMVwGbBGSMnHoTXyN4UJHjbTcdfNP/oDV9ParrlxNo8dxCFWzju4VhmwQ+5QN6tHwx5JwVGe+OhPoZYr0fn/kfAeIaUswjGSuuRfmzzLxT4Mhspp9N0fTNLlsjEbuGeJ2hmJHQ7wGVhhvukDoeRgV19naWuleH7PwpqV7arZ+H7VL/wARQ3tqrb8ruD27t8wKFQmVx1yDU+lpBf8Aim1mvJEis7Flkna4DeY0aq0rMVZVIH7sHdjnnqSTUXxu8Q/8JL4B0zQfDcc81zq9+bQxtE0cu5ACIyCMjLNGcdwK/MOJlWrZzTy2lF8kne/Ztb9el7ba2Z+a1qdDBQni4w95K2nXsvvPF/EPiDVtZ+I+peKtMvrwRsUkeSPdC8Ct/CCudqDYFViR645r9APBuuWfiTwBo+u2CyLb3dqkipI25l4wVJ7kEEZ74r4H+Inw81j4beLrax1eYytLAt4s1rK0e4E7TFxjByvTJ4wa+of2ffH+gX3ha08HWECWksclwbTTYpGna1tkIw00jclmZzzxnPAAFfq2RYeOFgqUVZWVtLOy7nxWU4qX1qpTxD5aj1cel97x+/U9zooor6I+mCiiigDwvxj8IvEXxU+MMup+KL9tN8Kadtgs7SN901yMAu47Rhm43HLYA4HWtHxZ8YfhN4A8rwJdWZvLa2QW0tna2yyw26gYCNuIDH2GT617HXzz49+KXjP4ZfEdrDxf4d0zxB4cunM1jdpD5UoTum45UuvoQMjByM1hUUaactr9dzyMXGlgozrp8rk9ZNN/f5CfDnTtB8NeGfEGqjTJp/DWp3i3lhqWoWZg8qF2VZI3zhlA5wwwpGK8s+H1knjDxZ481m3uLxPD1nFM9rY7yoDXE+2Ntv3cBEzg5+6Peu3+JXilvjB408K+FfDV20nha4tV1C/QZRfvspW4x90KUC4Jxl/pV3xX421v4ceJNJvb/SY7jwPr+mQx3NpDAqLaHBDRROoGCgOQp6/NjBrgqYLCzbnKC9bav57maxUKfJVjJqnTfS9ndb+iuQ2+lT3kttJJDJcC4ijkSV9zYD/6z5+i4Xj+9uAIx0ry749wx22raZbxZ8uICNc+giUD+VdRqHxG1GTXLjwN8OPL1UmZo7TWCCQIm53BOnykn5zxwCBXLfHmJoNT0uCSZpnjUI0rnLORCgLH3OM1yYv+DNeR+mcF4+ji83o+wd1GVm+l7PS/U8nsL680vVLfUtOuZLa7tpBLDNGcMjA5BFfXkupWf7SX7NtxptvYWbeLrYpCfNkMQspiQDcArzsK7jgZz93mvjuuq+HfjvVfhz48tfEelkuqny7q2zgXEJPzIffuD2NeZlWYywVZST0P13jPhiGd4N8i/ex+F9/J+vTsz7F+Avwh/wCFUeH9U0/ULe3udUe6ZRq0ZP8ApVvwyAKT+72ksCo7jPNeTftMfB46bezfEbw3agWczZ1S3iX/AFTn/lsAP4T/ABe/Pc19ReGfEek+LfCtl4h0W5E9ldxiRGHUeqkdiDwRWhd2ltf2E1leQJPbzIY5IpBlXUjBBHpX1uPprMINzd29bn4XkWaV8gxiq01bl0lHuuqf9bn5meGSB4x04nOPNPT/AHWr6ef+zvEGi2uv6G638N1Ap82MNJtlVVCKVBBX+LPuFzxXl3xD+Fdz8MfjfpiWySPoN7deZYznnbwcxMf7y9vUfjVPStW1b4SfESS3kWd9LfEkluDkXEDDKunbcAcZ9iK8DCU5UIOE90/8j3fEXiOgsVhsZDWjUik3/K23a/z0Z7Loumy23jWaWOH7RJFC0BFy28Bni+RGP90k4I6cEjrWroWn6hpHh+Fdb0Gwgfe0VrDZoiCKZikkUjBcqpWVCMgnjGfSuQ8G67qGp/GnXdENwWs00me7uDD8yeeAkqMD32ZVQf8Ae/vVo+IvH+sP48h8GrbaebR7A3V3fx+YyZ8hpVUkgbBwue46DmvgeKsqzLB5jDN8tinFK8m+jjdbX1un958nRzTC4iMk3pzcq82d1rXgTT/ipo19oPi2+uLXU5Cl2slqsbrEVAUNAzJkAdCDyd3PXNafwl+CujfCr7bdQajNqmpXYEb3csYj2xg52qoJ6nBJzzgdMVkfCzW9R8Q6jpt5qIZblHulYPEIpFjCoMSIpIByyng9Md69mr7nhDMMRmeXxxGNS9qm4trZ2e5x4vA4dYlVVH3ls+oUUUV9WMKKKKACvO/ir41+G3h3QP7M8epb6iLhfMj0ryhNLJjowX+Hn+IkfWvRK+W/GHwA8SajqfiLxx4v8QxXpaf7QtrYqzs0AkGVZmA2hYsjaoPTg1jWlJR9xXOHHyxHIoYaClKTtrsl3fct/DLx34bsW8Q6l4I+Gx0+xuIkZLGa4bztS2ByxhZlKEhc/u93OODnNcr4z+Ic/wARrDRfh/8ADRrmLT9Yd2udMdP30BZgPLYjIEIyz5HGOO2K6eDTIorSC8sdUs7W7iaOeWKRljcSx42FHzxH8oIXG0jjIyaq+DDB4Z8Z67rfhG1Md3rUHkraPD8ljJvLO8Uh+/HycDt0bIAzyqo5R5W7LqVjMpxXLToUpe69JNKz76W27HJNY2vw3/aWnsvCFk0Xh25vI9LfYh8ksVUvGG5+ZHOfzrN/aCgm/ti0uBGxhSQKz44UtGNufrtb8jWn8VtXuPCdjoHhzTbp0kjmGr3dz1aSRZMgnPXLByfXAr1K50zSvFmnmHVLYCYKqzRgjkHkEgghlPUZH65rirRjVUo9z3uFMZTyvMJ+ybm6UlJp9OZbJ/efGNFfWn/CofA/bTAPwX/CqOsfBjwnd6JcQWFn5NwV+RxtBB9jjg/p615P9lvpI/Z4eItBtKVBpeqOC/Z7+LreAfFY8P61cMPD2pSAMzH5bSY8CT2U8BvwPavuRWV0DqQVIyCOhFfGvgn4I6cllNN4lDXMjsVQbNnAPZT09yevbjk+mweGGtbWO2tvEniGGGJQkcaXzBUUDAAHYCvZy6c8PT5Kr9PI/PuL62DzLGvEYGLV929E/NLf/M9B+MNlp958Lbr7bFE8sUsctsXHKyBuq++N34Zr5b8eahfeOtU/4RzTYrS207Q4o/tWqXBCCFyoBzIRlRn5QoyWIr2VvD1uD5+pazql7DGCxW9uTIgHfOeg9fWvBfihsHixdB0aza3hm/f/AGdSczySuSrOO5JYsM9Nw6YrXE1Yz1R+e59F0MC/av3W0rLd32Xld7nqfgSz0H4c/s56p4stvM1PWLtEW6nnG04Cq5t8D7qqfkPr19McJ4e8R69eeF7nX9S8X3jxPLcW0ljKT5MNxKQVkRVVsDy5JTjacFRwQa9KudLGj+H9W0S6tJryx1GzmhEEIAZpXRAJEJwPMXYBtJ+YcjkEHI0nQvAFr4U0iy0rWpP7UsSwljmc25mdiDKZ4nx8mVHvhQoNfLcX5hUp4anhaFOUnVfLorpdde19tfM3oZTUhi4OLtSinp3bZ6h8ENAh0rQm8uWOX7NF5RdCCWeU+a7NjAztMQ6Dp0HSvW68f+F8Mw8e38+myyS6a1vmeVs4lkJB3fUneR+OOCK9gr6bIcD9SwNOg91q/NvV/ideJ/iMKKKK9g5wooooAKD0oooA8m+JXwffXtBluPAuovoOroxkWNGxBN1ymCD5eexXHNfLeowfFr4fXM95qq+JNO2MPNuZ8zROegy5yrewzX36cY5r5W1e28S/tEfGOaytJZ7fwNo9wYTcqSsbhSQzL2eRiCB/dXn68WKoqVmtzwM9o1JqEqVSam9Eouy+fkurPDvEvjDVPH8+m3NzpRN+IGtjLbqSJhnKMYxkqcswPOOR0r6BbUWN7p8liLqRolS2tGiicC5CqAy42/Pl8rzwu0nrWT4D+GWufDO0ufFus2UcEsubSyjdGlNvH5mCXVf43ULtGfUEgkV6PB45j8AeGJY5EcaY8zOmoXysnlyyEsyrFjfJltzBRjGSCR1r4irxNSwWaSwOOi4RteMtfefZL8u7PU4dwWJo0p4uvrVqWv6K6T9bbmDDreo2vhm/kvvK+3WsgtV84hMzsQu1scYDt1HYVb1nRofCWsabfNfyXEEiD7XqRIZLhyGyFx0UHb8p57joa4jQ/EmrT3OtalL4dtJYJ9RKQ6siLdFPMZsPjO0ggZAABycYOK6fQ/FN/ZWt1e6np9gqQuI5bizixHJ8oJS4h5A67d38J9ORW9HP8RUk5rCv2N7c3MnK3fl6rvZ3PpW5NKSe3Qk1zW7HULOLTdJvPt1zPMga3sny8sQYF1DD7pK557VeFtf6RqE0WnLbf2c5EdtbalqCpOkuMhOAwOR2zn2rO8VzWmvajcN4eil0i2WExT2VvbLZyGNo9wdpMfJl/qWC47VyOh2Gnf2lBa61eTSJdgzC5VC6REJ8i71YOSctkk9cdxivOzbMM2qVakcA4wpw6yS1fk5NK39XKjLRTkjX1vUNbsoWXX7WaLyle4iaRgIztwxcMgKOF2thGIyCO9eeaLd+JviF4+1jxb4e8Ii41K1toTC7zKILDhh50m7774BKgcAgnBwK9HOk3+g6c+n2NofEOgygrNo9wTIfKGBtiDAZxktnAbOMgdTsfC3xv8PPCWkXmm6B5EdvLMJruC6lEV1BI/Ajcv8AK4GCo+YEYPXrWeS8W+0qfV8zXK19pLR9rrXl9dU+jPJzTB18VOn7OS5Fdtdb9Leh4+PB/jLXPF8nhzw74yl1m+uNH/ta7ltLxngvGJ4iDZwNoIUHjnIwM1J4M8LeOPG3hzV7HQ/Euop4i0edVfSb6fazQEY+VnG5WV1YEE45HTjPpun6B4X+GGoeNvGuhx6hDatpnmwRTQbGs7jeSkayAkFWLjC4zgc5GKxrz4n2ul/FLw/4s8R6KIoL23juLPxLpgMM01uwAkiuIuUl2tlWxgjAI7V95RlQrwjWhJOL7O6t3ufJVqDw81LEVpRezXM9m7J+WvX7z2v4Val4nk8OjSPFPgSXw7eWyfvLiMxm3um6F12sWDHqQfzNehUyKWOeBJ4XWSORQ6OpyGBGQRT69WKsrH0lOLjFJu/mFFFFMsKKKKACiiigBssaTQvDIu5HUqw9QetV9O03T9I0uHTtLsoLOzgXZFBAgREHoAKtUUARzQQ3Nu8FxEksTjayOMhh6EV4h4S8O3XjnU/HXh/X7+d9G03W2s7WBoVYeUFDbd5GTgtjqeODXudNSKOIERxqgJLEKMZJ6n6152PynB5hy/Wqalyu6utvRgpTjJOMrfqcf4g8L6bY/DuaysLFHit3S5kjZAxmCMC24d/lB49uK43UNK8Jx3lpPqGn2ht7tfseyECOSQH51MW3ksuC2PTNeycV5P8AED4XXuqRte+Gr2W2mW3nt40U8wrNjzNgPHIGAQQy5ODj5a+M4q4exbxeGzPLHZ0VZxWzXTT8+ttjuw1eKjKE+pq2/wAP/DuqWg1S01GPUtQ3Ax3lxGsqqACPLMYwAPmOejZPWnP4U1y1SaZbTQ5t4/eLEGiaUD1JBB+h/OvBLpfHXgvUobOCzuFtllERmuN2Io+MYwFkOMMCSccgYHFewRLpt7GkMf2nWZSBmGOWW4Vj7gsVA+pr5TiDMsux84Rx2XTnWkrLkb/Ha3zTOmnGpG7U9PMXwRb6drfiu/gtYVuNDks45ipztjm3cbCPukDcOD6gdK1db+D2gazIzyeRKWOSL22WY/8AfQ2sT9Sa67wxo/8AYvhuC1ljiW5Yb5zGON57fQDCj2ArYr9AyjhXC08to4bGQ55RW73V9bXVnocNTESc3KDscbL4AttR+HOq+ENcuo7u2v2ch44jGYi2CCMsxJVhuBz7Uxvhd4UvfhVpvgTWrBNQsbG3SJJGGxw4GDIpHKsTk8Hv3rtaK+ooYWlQpxo042jFWS8l0OOpShUk5TSbej9DP0LSIdA8M2GiW8888NlAlvHJO25yqjAycDJwBWhRRW5SVtEFFFFAz//Z', IMG_SESPA = 'data:image/jpeg;base64,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';
+const TMED = [['pir', 'Pirimetamina', 'PIRIMETAMINA 25MG'], ['sul', 'Sulfadiazina', 'SULFADIAZINA 500MG'], ['esp', 'Espiramicina', 'ESPIRAMICINA 500MG'], ['acf', 'Ác. folínico', 'AC. FOLÍNICO 15MG']];
+const EST_ORDEM = ['esp', 'acf', 'pir', 'sul'];   // ordem do quadro de estoque do modelo
+const COND = { 1: 'Gestante com infecção aguda', 2: 'Imunodeprimido', 3: 'Toxoplasmose ocular', 4: 'Outro' };
+const LEGENDA_TOXO = '*Condição para tratamento: 1-Gestante com infecção aguda (CID10 O98.6); 2-Imunodeprimido (Inserir a CID10); 3 – Toxoplasmose ocular (CID10 B58.0); 4-Outro (Inserir a CID10)';
+const triOf = d => { const y = d.slice(0, 4), m = +d.slice(5, 7); return `${y}-T${Math.ceil(m / 3)}`; };
+const triMeses = t => { const y = t.slice(0, 4), q = +t.slice(6); return [1, 2, 3].map(i => `${y}-${pad((q - 1) * 3 + i)}`); };
+const triNome = t => `${t.slice(6)}º trimestre de ${t.slice(0, 4)}`;
+const triLista = () => { let [y, q] = [+hojeISO().slice(0, 4), Math.ceil(+hojeISO().slice(5, 7) / 3)]; const out = [];
+  for (let i = 0; i < 8; i++) { out.push(`${y}-T${q}`); if (--q < 1) { q = 4; y--; } } return out; };
+const triSelect = (id, val) => `<label style="flex-direction:row;align-items:center;gap:8px">Trimestre<select id="${id}">${[...new Set([val, ...triLista()])].sort().reverse().map(t => `<option value="${t}" ${t === val ? 'selected' : ''}>${triNome(t)}</option>`).join('')}</select></label>`;
+let verRetToxo = false, triToxo = triOf(hojeISO());
+const tmedNome = k => TMED.find(m => m[0] === k)[1];
+const mesesEntre = (a, b) => { const out = []; let [y, m] = a.split('-').map(Number); const [y2, m2] = b.split('-').map(Number);
+  while (y < y2 || (y === y2 && m <= m2)) { out.push(`${y}-${pad(m)}`); if (++m > 12) { m = 1; y++; } if (out.length > 36) break; } return out; };
+const mesBR = ym => ym ? ym.slice(5) + '/' + ym.slice(0, 4) : '';
+const condTxt = p => p.condicao ? `${p.condicao} · ${COND[p.condicao]}${p.cid ? ' (' + esc(p.cid) + ')' : ''}` : '—';
+
+function vToxoPac() {
+  const lista = D.toxo_pacientes.filter(doFiltro).filter(p => !!p.ativo !== verRetToxo).sort((a, b) => a.nome.localeCompare(b.nome));
+  const ult = id => D.toxo_dispensacoes.filter(d => d.paciente_id === id).map(d => d.data).sort().pop();
+  const tab = rs => `<div class="tw"><table><thead><tr><th>Paciente</th><th>Nascimento / sexo</th><th>Condição</th><th>Nº notificação SINAN</th><th>Última dispensação</th><th></th></tr></thead><tbody>${rs.map(p => { const u = ult(p.id), i = idade(p.nascimento);
+    return `<tr><td><b>${esc(p.nome)}</b>${p.condicao == 1 && p.ig ? `<div><span class="chip c-warn">Gestante · IG ${esc(p.ig)}</span></div>` : ''}${!p.ativo ? `<div><span class="chip c-mut">Encerrado ${fmtD(p.saida_data)}${p.saida_motivo ? ' · ' + esc(p.saida_motivo) : ''}</span></div>` : ''}</td>
+      <td>${fmtD(p.nascimento)}${i != null ? `<div class="sub">${i} anos · ${esc(p.sexo || '')}</div>` : `<div class="sub">${esc(p.sexo || '')}</div>`}</td><td>${condTxt(p)}</td><td>${esc(p.nnotif || '—')}</td>
+      <td>${u ? fmtD(u) + `<div class="sub">há ${dias(u)} dias</div>` : '—'}</td>
+      <td class="n"><div class="gap" style="justify-content:flex-end">${p.ativo ? `<button class="btn sm" data-a="tdisp" data-id="${p.id}">Dispensar</button>` : ''}<button class="btn sm sec" data-a="tpac" data-id="${p.id}">Editar</button>
+        ${p.ativo ? `<button class="btn sm red" data-a="tret" data-id="${p.id}">Encerrar</button>` : `<button class="btn sm sec" data-a="treat" data-id="${p.id}">Reativar</button>`}</div></td></tr>`; }).join('')}</tbody></table></div>`;
+  return `<div class="row"><div class="gap"><button class="btn" data-a="tpac">Incluir paciente</button><button class="btn sec" data-a="texp">Baixar prestação de contas (Excel)</button></div>
+      <select id="verRetToxo"><option value="0">Em tratamento</option><option value="1" ${verRetToxo ? 'selected' : ''}>Tratamento encerrado</option></select></div>
+    <div class="card">${porMun(lista, tab, verRetToxo ? 'Nenhum tratamento encerrado.' : 'Nenhum paciente em tratamento cadastrado.')}</div>
+    <div class="sub">${esc(LEGENDA_TOXO)}</div>`;
+}
+function formToxoPac(p) {
+  p = p || {};
+  dlg(`<form id="fTP"><h2>${p.id ? 'Editar paciente' : 'Incluir paciente'} · toxoplasmose</h2><div class="grid">${munSelect('tpMun', p.municipio)}
+    <label>Nome ou iniciais do usuário<input id="tp_nome" required value="${esc(p.nome || '')}"></label>
+    <label>Data de nascimento<input id="tp_nascimento" type="date" value="${esc(p.nascimento || '')}"></label>
+    <label>Sexo<select id="tp_sexo"><option value=""></option><option ${p.sexo === 'F' ? 'selected' : ''}>F</option><option ${p.sexo === 'M' ? 'selected' : ''}>M</option></select></label>
+    <label>Condição para tratamento<select id="tp_condicao" required><option value=""></option>${Object.entries(COND).map(([k, v]) => `<option value="${k}" ${String(p.condicao) === k ? 'selected' : ''}>${k} · ${v}</option>`).join('')}</select></label>
+    <label>CID-10<input id="tp_cid" value="${esc(p.cid || '')}" placeholder="preenchido para 1 e 3"></label>
+    <label>Idade gestacional (se gestante)<input id="tp_ig" value="${esc(p.ig || '')}" placeholder="ex.: 22 semanas"></label>
+    <label>Nº da notificação no SINAN<input id="tp_nnotif" value="${esc(p.nnotif || '')}"></label></div>
+    <div class="sub">${esc(LEGENDA_TOXO)}</div>
+    <div class="row"><span class="err" id="tpErr"></span><div class="gap"><button type="button" class="btn sec" data-a="fechar">Cancelar</button><button class="btn">Salvar</button></div></div></form>`);
+  $('fTP').onsubmit = async e => { e.preventDefault();
+    const r = { municipio: $('tpMun').value }; ['nome', 'nascimento', 'sexo', 'cid', 'ig', 'nnotif'].forEach(k => r[k] = $('tp_' + k).value.trim() || null); r.condicao = +$('tp_condicao').value || null;
+    if ((r.condicao === 2 || r.condicao === 4) && !r.cid) { $('tpErr').textContent = 'Para as condições 2 e 4, informe a CID-10.'; return; }
+    if (await salvar(() => p.id ? db.update('toxo_pacientes', p.id, r) : db.insert('toxo_pacientes', { ...r, ativo: true }), 'Paciente salvo.')) $('dlg').close(); };
+}
+function formToxoRet(p) {
+  dlg(`<form id="fTR"><h2>Encerrar tratamento · ${esc(p.nome)}</h2><div class="sub">Sai da lista em tratamento; as dispensações continuam na prestação de contas.</div>
+    <div class="grid"><label>Motivo<select id="trMot"><option>Fim do tratamento</option><option>Parto / fim da gestação</option><option>Transferência</option><option>Óbito</option><option>Abandono</option><option>Outro</option></select></label>
+    <label>Data<input type="date" id="trData" value="${hojeISO()}" required></label></div>
+    <div class="row"><span></span><div class="gap"><button type="button" class="btn sec" data-a="fechar">Cancelar</button><button class="btn">Encerrar</button></div></div></form>`);
+  $('fTR').onsubmit = async e => { e.preventDefault();
+    if (await salvar(() => db.update('toxo_pacientes', p.id, { ativo: false, saida_motivo: $('trMot').value, saida_data: $('trData').value }), 'Tratamento encerrado.')) $('dlg').close(); };
+}
+function vToxoDisp() {
+  const pac = id => D.toxo_pacientes.find(p => p.id === id) || {};
+  const ms = triMeses(triToxo), lista = D.toxo_dispensacoes.filter(doFiltro).filter(d => ms.includes((d.data || '').slice(0, 7))).sort((a, b) => a.data.localeCompare(b.data));
+  const soma = (rs, k) => rs.reduce((s, d) => s + (+d[k] || 0), 0);
+  const tab = rs => `<div class="tw"><table><thead><tr><th>Data</th><th>Paciente</th><th>Condição</th>${TMED.map(m => `<th class="n">${m[1]}</th>`).join('')}<th></th></tr></thead><tbody>${rs.map(d => `<tr>
+    <td>${fmtD(d.data)}</td><td><b>${esc(pac(d.paciente_id).nome)}</b></td><td>${pac(d.paciente_id).condicao || '—'}</td>${TMED.map(m => `<td class="n">${d[m[0]] || ''}</td>`).join('')}
+    <td class="n"><div class="gap" style="justify-content:flex-end"><button class="btn sm sec" data-a="teditDisp" data-id="${d.id}">Editar</button><button class="btn sm red" data-a="tdelDisp" data-id="${d.id}">Excluir</button></div></td></tr>`).join('')}
+    <tr><td colspan="3"><b>Total</b></td>${TMED.map(m => `<td class="n"><b>${soma(rs, m[0])}</b></td>`).join('')}<td></td></tr></tbody></table></div>`;
+  return `<div class="row"><div class="gap"><button class="btn" data-a="tdisp">Registrar dispensação</button><button class="btn sec" data-a="texp">Baixar prestação de contas (Excel)</button></div>
+    ${triSelect('triToxo', triToxo)}</div>
+    <div class="card"><div class="row" style="padding-bottom:6px"><h2>Unidades dispensadas no ${triNome(triToxo)}</h2><span class="sub">${lista.length} dispensação(ões) · ${ms.map(mesBR).join(', ')}</span></div>
+    ${porMun(lista, tab, 'Nenhuma dispensação registrada neste trimestre.')}</div>`;
+}
+function formToxoDisp(pid, d) {
+  const ativos = D.toxo_pacientes.filter(p => p.ativo && doFiltro(p)).sort((a, b) => a.nome.localeCompare(b.nome));
+  if (!d && !ativos.length) { toast('Cadastre o paciente primeiro, em Toxoplasmose › Pacientes.'); return; }
+  const base = d || { paciente_id: pid || ativos[0].id, data: hojeISO() };
+  const opts = (d ? D.toxo_pacientes.filter(p => p.id === d.paciente_id) : ativos).map(p => `<option value="${p.id}" ${p.id === base.paciente_id ? 'selected' : ''}>${esc(p.nome)} · ${p.municipio}</option>`).join('');
+  dlg(`<form id="fTD"><h2>${d ? 'Editar dispensação' : 'Registrar dispensação'} · toxoplasmose</h2>
+    <div class="grid"><label>Paciente<select id="tdPac" ${d ? 'disabled' : ''}>${opts}</select></label><label>Data da dispensação<input type="date" id="tdData" required value="${esc(base.data || '')}"></label></div>
+    <div class="sub">Unidades dispensadas (comprimidos). Deixe em branco o que não foi dispensado.</div>
+    <div class="grid">${TMED.map(([k, n, f]) => `<label>${n} <span class="sub">${f.split(' ').pop().toLowerCase()}</span><input type="number" min="0" id="td_${k}" value="${base[k] ?? ''}"></label>`).join('')}</div>
+    <div class="row"><span class="err" id="tdErr"></span><div class="gap"><button type="button" class="btn sec" data-a="fechar">Cancelar</button><button class="btn">Salvar</button></div></div></form>`);
+  $('fTD').onsubmit = async e => { e.preventDefault();
+    const p = D.toxo_pacientes.find(x => x.id === +$('tdPac').value), r = { data: $('tdData').value };
+    TMED.forEach(([k]) => { const v = $('td_' + k).value; r[k] = v === '' ? null : Math.max(0, +v); });
+    if (!TMED.some(([k]) => r[k])) { $('tdErr').textContent = 'Informe a quantidade de pelo menos um medicamento.'; return; }
+    if (await salvar(() => d ? db.update('toxo_dispensacoes', d.id, r) : db.insert('toxo_dispensacoes', { ...r, paciente_id: p.id, municipio: p.municipio }), 'Dispensação salva.')) { $('dlg').close(); triToxo = triOf(r.data); render(); } };
+}
+function vToxoEst() {
+  const mun = filtroMun(), ms = triMeses(triToxo);
+  const disp = (mu, k) => D.toxo_dispensacoes.filter(d => d.municipio === mu && ms.includes((d.data || '').slice(0, 7))).reduce((s, d) => s + (+d[k] || 0), 0);
+  const topo = `<div class="row"><div class="gap"><button class="btn sec" data-a="texp">Baixar prestação de contas (Excel)</button></div>
+    ${triSelect('triToxo', triToxo)}</div>`;
+  if (!mun) {   // regional vendo todos: quadro de quem já enviou
+    return topo + `<div class="card"><h2 style="padding-bottom:10px">Prestação de contas do ${triNome(triToxo)} · saldo atual informado</h2><div class="tw"><table><thead><tr><th>Município</th><th>Situação</th>
+      ${EST_ORDEM.map(k => `<th class="n">${tmedNome(k)}</th>`).join('')}<th>Responsável</th><th></th></tr></thead><tbody>${MUNS.map(mu => { const e = D.toxo_estoque.find(x => x.municipio === mu && x.periodo === triToxo);
+        return `<tr><td><b>${mu}</b></td><td>${e ? '<span class="chip c-ok">Enviada</span>' : '<span class="chip c-warn">Pendente</span>'}</td>${EST_ORDEM.map(k => `<td class="n">${e && e.itens[k] && e.itens[k].saldo != null ? e.itens[k].saldo : '—'}</td>`).join('')}
+        <td>${e ? esc(e.responsavel || '') : ''}</td><td class="n"><button class="btn sm sec" data-a="testVer" data-mun="${mu}">Abrir</button></td></tr>`; }).join('')}</tbody></table></div>
+      <div class="sub" style="padding-top:8px">Clique em "Abrir" para ver ou preencher o estoque de um município.</div></div>`;
+  }
+  const e = D.toxo_estoque.find(x => x.municipio === mun && x.periodo === triToxo) || { itens: {} };
+  return topo + `<form class="card" id="fTE" style="display:flex;flex-direction:column;gap:14px"><h2>Estoque de medicação · ${mun} · ${triNome(triToxo)}</h2>
+    <div class="sub">${e.id ? 'Prestação de contas enviada. Você pode corrigir e salvar de novo.' : 'Ainda não enviada neste trimestre.'} "Recebido" é o que chegou no trimestre; "Saldo atual" é o que tem hoje na farmácia.</div>
+    <div class="tw"><table class="calc"><thead><tr><th>Medicamento</th><th class="n">Recebido</th><th class="n">Saldo atual</th><th>Lote</th><th>Validade</th><th class="n">Dispensado no trimestre</th></tr></thead><tbody>
+    ${EST_ORDEM.map(k => { const it = e.itens[k] || {}, f = TMED.find(x => x[0] === k)[2];
+      return `<tr><td><b>${f}</b></td><td class="n"><input type="number" min="0" id="te_rec_${k}" value="${it.recebido ?? ''}"></td><td class="n"><input type="number" min="0" id="te_sal_${k}" value="${it.saldo ?? ''}"></td>
+        <td><input id="te_lote_${k}" value="${esc(it.lote || '')}" style="width:130px"></td><td><input type="date" id="te_val_${k}" value="${esc(it.validade || '')}"></td><td class="n">${disp(mun, k)}</td></tr>`; }).join('')}</tbody></table></div>
+    <label style="max-width:420px">Responsável pelo preenchimento<input id="teResp" required value="${esc(e.responsavel || '')}"></label>
+    <div class="row"><span class="sub">"Dispensado no trimestre" vem das dispensações registradas e serve para conferir o saldo.</span><button class="btn">${e.id ? 'Salvar alterações' : 'Enviar prestação de contas'}</button></div></form>`;
+}
+async function salvarEstoque() {
+  const mun = filtroMun(), itens = {};
+  EST_ORDEM.forEach(k => { const n = id => { const v = $(id).value; return v === '' ? null : Math.max(0, +v); };
+    itens[k] = { recebido: n('te_rec_' + k), saldo: n('te_sal_' + k), lote: $('te_lote_' + k).value.trim() || null, validade: $('te_val_' + k).value || null }; });
+  const ex = D.toxo_estoque.find(x => x.municipio === mun && x.periodo === triToxo), r = { itens, responsavel: $('teResp').value.trim(), atualizado_em: new Date().toISOString() };
+  await salvar(() => ex ? db.update('toxo_estoque', ex.id, r) : db.insert('toxo_estoque', { ...r, municipio: mun, periodo: triToxo }), 'Prestação de contas salva.');
+}
+function formToxoExp() {
+  dlg(`<form id="fTX"><h2>Baixar prestação de contas · toxoplasmose</h2><div class="sub">Sai no modelo do relatório de distribuição, com as dispensações do trimestre, a legenda e o estoque informado no trimestre. ${isReg() ? 'Com "Todos", cada município sai numa aba.' : ''}</div>
+    <div class="grid">${triSelect('txTri', triToxo).replace('flex-direction:row;align-items:center;gap:8px', '')}
+    ${isReg() ? `<label>Município<select id="txMun"><option value="">Todos (uma aba por município)</option>${MUNS.map(m => `<option ${m === filtroMun() ? 'selected' : ''}>${m}</option>`).join('')}</select></label>` : ''}</div>
+    <div class="row"><span class="err" id="txErr"></span><div class="gap"><button type="button" class="btn sec" data-a="fechar">Cancelar</button><button class="btn">Baixar</button></div></div></form>`);
+  $('fTX').onsubmit = async e => { e.preventDefault();
+    try { await exportarToxo($('txTri').value, isReg() ? $('txMun').value : perfil); $('dlg').close(); } catch (er) { console.error(er); $('txErr').textContent = 'Não foi possível gerar a planilha.'; } };
+}
+async function exportarToxo(tri, mun) {
+  const wb = new ExcelJS.Workbook(), meses = triMeses(tri), nM = 3;
+  const imgPA = wb.addImage({ base64: IMG_PA, extension: 'jpeg' }), imgSE = wb.addImage({ base64: IMG_SESPA, extension: 'jpeg' });
+  const fino = { style: 'thin' }, grosso = { style: 'medium' }, borda = { top: fino, left: fino, bottom: fino, right: fino };
+  const dt = iso => iso ? new Date(iso + 'T12:00:00') : null, periodo = `${tri.slice(6)}º TRIMESTRE/${tri.slice(0, 4)} (${mesBR(meses[0])} a ${mesBR(meses[2])})`;
+  for (const mu of (mun ? [mun] : MUNS)) {
+    const ws = wb.addWorksheet(norm(mu).slice(0, 31), { pageSetup: { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: .3, right: .3, top: .4, bottom: .4, header: .2, footer: .2 } } });
+    ws.columns = [30, 14, 11, 6, 11, 11, 12, 12, 8, 8, 8, 8, 8, 8, 8].map(w => ({ width: w }));
+    // cabeçalho com os brasões
+    ws.mergeCells('A1:B5'); ws.mergeCells('C1:L5'); ws.mergeCells('M1:O5');
+    const cab = ws.getCell('C1'); cab.value = 'SECRETARIA DE ESTADO DE SAÚDE PÚBLICA\nDIVISÃO DE VIGILÂNCIA EM SAÚDE\n8º CENTRO REGIONAL DE SAÚDE\nRELATÓRIO DE DISTRIBUIÇÃO DE MEDICAMENTO PARA TOXOPLASMOSE';
+    cab.font = { bold: true, size: 11 }; cab.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    for (let r = 1; r <= 5; r++) { ws.getRow(r).height = 17; for (let c = 1; c <= 15; c++) { const cl = ws.getCell(r, c), b = {};
+      if (r === 1) b.top = grosso; if (r === 5) b.bottom = grosso; if (c === 1 || c === 3 || c === 13) b.left = grosso; if (c === 2 || c === 12 || c === 15) b.right = grosso; cl.border = b; } }
+    ws.addImage(imgPA, { tl: { col: 0.75, row: 0.15 }, ext: { width: 78, height: 78 } });
+    ws.addImage(imgSE, { tl: { col: 12.9, row: 0.15 }, ext: { width: 66, height: 79 } });
+    ws.getCell('A7').value = 'UF: PARÁ'; ws.getCell('C7').value = 'PERÍODO: ' + periodo; ws.getCell('G7').value = 'REGIONAL: 8º CRS – MARAJÓ II'; ws.getCell('L7').value = 'MUNICÍPIO: ' + mu;
+    ['A7', 'C7', 'G7', 'L7'].forEach(c => ws.getCell(c).font = { bold: true, size: 10 });
+    // cabeçalho da tabela
+    ws.mergeCells('I9:L9'); ws.mergeCells('M9:O9');
+    ws.getCell('I9').value = 'Unidades dispensadas'; ws.getCell('M9').value = 'Consumo médio mensal no período';
+    ['I9', 'M9'].forEach(c => { const cl = ws.getCell(c); cl.font = { bold: true, size: 10 }; cl.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; });
+    for (let c = 9; c <= 15; c++) ws.getCell(9, c).border = borda; ws.getRow(9).height = 30;
+    const H = ['Nome ou Iniciais do usuário', 'Município', 'Data de Nascimento DD/MM/AA', 'Sexo (M/F)', '*Condição para tratamento (1, 2, 3 ou 4)', 'Se gestante, insira a Idade Gestacional', 'Nº da Notificação no SINAN', 'Data da dispensação (DD/MM/AA)',
+      'Pirimetamina', 'Sulfadiazina', 'Espiramicina', 'Ac. Folínico', 'Pirimetamina', 'Sulfadiazina', 'Espiramicina'];
+    const hr = ws.getRow(10); hr.values = H; hr.height = 112;
+    hr.eachCell((cl, n) => { cl.font = { bold: true, size: 10 }; cl.border = borda; cl.alignment = n === 1 ? { horizontal: 'center', vertical: 'middle', wrapText: true } : { textRotation: 90, horizontal: 'center', vertical: 'middle', wrapText: true }; });
+    // linhas: uma por dispensação no período
+    const ds = D.toxo_dispensacoes.filter(d => d.municipio === mu && meses.includes((d.data || '').slice(0, 7)));
+    const pac = id => D.toxo_pacientes.find(p => p.id === id) || {};
+    ds.sort((a, b) => (pac(a.paciente_id).nome || '').localeCompare(pac(b.paciente_id).nome || '') || a.data.localeCompare(b.data));
+    let r = 11; const vistos = new Set();
+    if (!ds.length) { ws.mergeCells(`A${r}:O${r}`); ws.getCell(`A${r}`).value = 'SEM DISPENSAÇÕES NO PERÍODO'; ws.getCell(`A${r}`).alignment = { horizontal: 'center' }; ws.getCell(`A${r}`).border = borda; r++; }
+    for (const d of ds) {
+      const p = pac(d.paciente_id), primeira = !vistos.has(p.id); vistos.add(p.id);
+      const tot = k => ds.filter(x => x.paciente_id === p.id).reduce((s, x) => s + (+x[k] || 0), 0), cm = k => primeira && tot(k) ? Math.round(tot(k) / nM * 10) / 10 : null;
+      ws.getRow(r).values = [p.nome, mu, dt(p.nascimento), p.sexo, p.condicao ? (p.condicao == 2 || p.condicao == 4 ? `${p.condicao} (${p.cid || ''})` : p.condicao) : null, p.condicao == 1 ? p.ig : null, p.nnotif, dt(d.data),
+        d.pir, d.sul, d.esp, d.acf, cm('pir'), cm('sul'), cm('esp')].map(v => v ?? null);
+      for (let c = 1; c <= 15; c++) { const cl = ws.getCell(r, c); cl.border = borda; cl.font = { size: 10 }; if (cl.value instanceof Date) cl.numFmt = 'dd/mm/yy'; if (c >= 3) cl.alignment = { horizontal: 'center' }; }
+      r++;
+    }
+    if (ds.length) { ws.getCell(`A${r}`).value = 'TOTAL'; ['pir', 'sul', 'esp', 'acf'].forEach((k, i) => ws.getCell(r, 9 + i).value = ds.reduce((s, x) => s + (+x[k] || 0), 0));
+      for (let c = 1; c <= 15; c++) { const cl = ws.getCell(r, c); cl.border = borda; cl.font = { bold: true, size: 10 }; if (c >= 3) cl.alignment = { horizontal: 'center' }; } r++; }
+    // responsável e legenda
+    const ests = D.toxo_estoque.filter(e => e.municipio === mu && e.periodo === tri), ultE = ests[0];
+    r += 1; ws.getCell(`A${r}`).value = 'Responsável pelo preenchimento: ' + (ultE && ultE.responsavel ? ultE.responsavel : ''); ws.getCell(`A${r}`).font = { size: 11 };
+    r += 2; ws.mergeCells(`A${r}:O${r}`); const lg = ws.getCell(`A${r}`); lg.value = LEGENDA_TOXO; lg.font = { italic: true, size: 10 }; lg.alignment = { wrapText: true }; ws.getRow(r).height = 30;
+    // estoque
+    r += 2; ws.getCell(`A${r}`).value = `ESTOQUE DE MEDICAÇÃO – ${tri.slice(6)}º TRIMESTRE/${tri.slice(0, 4)}`; ws.getCell(`A${r}`).font = { bold: true, size: 12 };
+    r += 2; const cinza = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBFBFBF' } };
+    ws.mergeCells(`D${r}:F${r}`); ws.mergeCells(`G${r}:H${r}`);
+    [['A', ''], ['B', 'RECEBIDO'], ['C', 'SALDO ATUAL'], ['D', 'LOTE'], ['G', 'VALIDADE']].forEach(([c, v]) => { const cl = ws.getCell(`${c}${r}`); cl.value = v; cl.font = { bold: true, size: 10 }; cl.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; if (c !== 'A') cl.fill = cinza; });
+    for (let c = 1; c <= 8; c++) ws.getCell(r, c).border = borda; ws.getRow(r).height = 28; r++;
+    for (const k of EST_ORDEM) {
+      const rec = ests.reduce((s, e) => s + (+(e.itens[k] || {}).recebido || 0), 0), it = ultE ? (ultE.itens[k] || {}) : {};
+      ws.mergeCells(`D${r}:F${r}`); ws.mergeCells(`G${r}:H${r}`);
+      ws.getCell(`A${r}`).value = TMED.find(x => x[0] === k)[2]; ws.getCell(`A${r}`).font = { bold: true, size: 10 }; ws.getCell(`A${r}`).fill = cinza;
+      ws.getCell(`B${r}`).value = ests.length ? rec : null; ws.getCell(`C${r}`).value = it.saldo ?? null; ws.getCell(`D${r}`).value = it.lote || null;
+      ws.getCell(`G${r}`).value = dt(it.validade); if (it.validade) ws.getCell(`G${r}`).numFmt = 'dd/mm/yyyy';
+      for (let c = 1; c <= 8; c++) { const cl = ws.getCell(r, c); cl.border = borda; if (c > 1) cl.alignment = { horizontal: 'center' }; }
+      r++;
+    }
+  }
+  const buf = await wb.xlsx.writeBuffer();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  a.download = `Prestacao_Toxoplasmose_${mun ? norm(mun).replace(/ /g, '_') : '8CRS'}_${tri.slice(6)}tri${tri.slice(0, 4)}.xlsx`; document.body.append(a); a.click(); a.remove();
+  if (DEMO) toast('No modo demonstração dentro do Claude o download pode ser bloqueado. No site publicado funciona.');
+}
+
 /* ======================= CLIQUES ======================= */
 function dlg(html) { const d = $('dlg'); d.innerHTML = html; if (!d.open) d.showModal(); }
 document.addEventListener('click', async e => {
@@ -755,6 +962,15 @@ document.addEventListener('click', async e => {
   if (a === 'editCaso') { const c = D.sinan_casos.find(x => x.id === id); formCaso(c.agravo, c); }
   if (a === 'delCaso') dlg(`<div class="dlg"><h2>Excluir este caso da lista?</h2><div class="sub">O apontamento e a resposta do município também são apagados.</div><div class="row"><span></span><div class="gap"><button class="btn sec" data-a="fechar">Cancelar</button><button class="btn" data-a="delCasoOk" data-id="${id}">Excluir</button></div></div></div>`);
   if (a === 'delCasoOk') { await salvar(() => db.del('sinan_casos', id), 'Caso excluído.'); $('dlg').close(); }
+  if (a === 'tpac') formToxoPac(D.toxo_pacientes.find(p => p.id === id));
+  if (a === 'tret') formToxoRet(D.toxo_pacientes.find(p => p.id === id));
+  if (a === 'treat') salvar(() => db.update('toxo_pacientes', id, { ativo: true, saida_data: null, saida_motivo: null }), 'Paciente voltou para a lista em tratamento.');
+  if (a === 'tdisp') formToxoDisp(id || null);
+  if (a === 'teditDisp') formToxoDisp(null, D.toxo_dispensacoes.find(d => d.id === id));
+  if (a === 'tdelDisp') dlg(`<div class="dlg"><h2>Excluir esta dispensação?</h2><div class="row"><span></span><div class="gap"><button class="btn sec" data-a="fechar">Cancelar</button><button class="btn" data-a="tdelDispOk" data-id="${id}">Excluir</button></div></div></div>`);
+  if (a === 'tdelDispOk') { await salvar(() => db.del('toxo_dispensacoes', id), 'Dispensação excluída.'); $('dlg').close(); }
+  if (a === 'texp') formToxoExp();
+  if (a === 'testVer') { $('filtro').value = b.dataset.mun; try { localStorage.setItem('filtroMun', b.dataset.mun); } catch (er) {} render(); }
   if (a === 'avPub') { const t = $('avTxt').value.trim(); if (!t) { toast('Escreva o texto do aviso.'); return; }
     await salvar(() => db.insert('avisos', { texto: t, municipio: $('avMun').value || null, importante: $('avImp').checked }), 'Aviso publicado.'); }
   if (a === 'avDel') dlg(`<div class="dlg"><h2>Remover este aviso?</h2><div class="sub">Ele deixa de aparecer para os municípios.</div><div class="row"><span></span><div class="gap"><button class="btn sec" data-a="fechar">Cancelar</button><button class="btn" data-a="avDelOk" data-id="${id}">Remover</button></div></div></div>`);
@@ -795,7 +1011,14 @@ function demoData() {
   seq = id + 10;
   const avisos = [{ id: id++, texto: 'Bem-vindos ao sistema de Vigilância em Saúde do 8º CRS. Dúvidas, falar com a coordenação regional.', municipio: null, importante: false, criado_em: iso(3) + 'T12:00:00Z' },
     { id: id++, texto: 'Pedido trimestral de hanseníase e tuberculose: enviar até o dia 10.', municipio: null, importante: true, criado_em: iso(1) + 'T12:00:00Z' }];
-  return { tali_pacientes, tali_dispensacoes, pedidos, sinan_casos, avisos };
+  const TP = [['M.F.S.', 'BREVES', 'F', '1998-04-10', 1, 'O98.6', '22 semanas'], ['J.C.P.', 'BREVES', 'M', '1979-08-21', 2, 'B20', null], ['Rita Fictícia Lobato', 'BREVES', 'F', '2001-12-02', 1, 'O98.6', '30 semanas'],
+    ['A.N.B.', 'PORTEL', 'M', '1990-02-17', 3, 'B58.0', null], ['L.M.R.', 'PORTEL', 'F', '1995-06-30', 1, 'O98.6', '18 semanas'], ['C.S.A.', 'CURRALINHO', 'F', '1988-10-05', 4, 'B58.9', null]];
+  const toxo_pacientes = TP.map(([nome, municipio, sexo, nascimento, condicao, cid, ig], i) => ({ id: id++, municipio, nome, sexo, nascimento, condicao, cid, ig, nnotif: String(7100100 + i), ativo: true }));
+  const toxo_dispensacoes = []; toxo_pacientes.forEach((p, i) => [0, 30].forEach((dd, k) => { if ((i + k) % 4 === 3) return;
+    toxo_dispensacoes.push({ id: id++, paciente_id: p.id, municipio: p.municipio, data: iso(dd + 2 + i), ...(p.condicao === 1 && i % 2 === 0 ? { esp: 90 } : { pir: 30, sul: 120, acf: 30 }) }); }));
+  const toxo_estoque = [{ id: id++, municipio: 'BREVES', periodo: triOf(hojeISO()), responsavel: 'Enf. Responsável Fictícia', atualizado_em: iso(1) + 'T12:00:00Z',
+    itens: { esp: { recebido: 180, saldo: 90, lote: 'ESP2405', validade: iso(-400) }, acf: { recebido: 60, saldo: 30, lote: 'ACF2311', validade: iso(-250) }, pir: { recebido: 60, saldo: 30, lote: 'PIR2402', validade: iso(-300) }, sul: { recebido: 240, saldo: 120, lote: 'SUL2408', validade: iso(-350) } } }];
+  return { tali_pacientes, tali_dispensacoes, pedidos, sinan_casos, avisos, toxo_pacientes, toxo_dispensacoes, toxo_estoque };
 }
 
 iniciar();
