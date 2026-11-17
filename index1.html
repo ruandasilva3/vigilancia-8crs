@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vigilância em Saúde · 8º CRS</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+:root{--brand:#0B5E6E;--brand2:#0A4A57;--acc:#5FD4C4;--bg:#F3F6F7;--ink:#142229;--mut:#4A5B62;--line:#DCE4E7;--warn:#FFF1D6;--warnk:#7A4B00;--bad:#FBE3E1;--badk:#8C1D18;--ok:#DDF3EF}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 'Atkinson Hyperlegible',Arial,sans-serif}
+button,input,select,textarea{font:inherit}
+.hide{display:none!important}
+h1{margin:0;font-size:26px}h2{margin:0;font-size:19px}h3{margin:0;font-size:16px}
+label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--mut)}
+input,select,textarea{font-size:15px;color:var(--ink);min-height:42px;padding:0 10px;border:1px solid #B9C7CC;border-radius:8px;background:#fff}
+textarea{padding:8px 10px;min-height:70px;resize:vertical}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:3px solid var(--acc);outline-offset:1px}
+.btn{min-height:42px;border:0;border-radius:9px;background:var(--brand);color:#fff;font-weight:700;padding:0 16px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--brand2)}
+.btn.sec{background:#fff;color:var(--brand);border:1px solid var(--brand);font-weight:400}
+.btn.sm{min-height:34px;padding:0 11px;font-size:14px}
+.btn.red{background:#fff;color:var(--badk);border:1px solid #E3B4AF;font-weight:400}
+.btn:disabled{opacity:.5;cursor:default}
+.err{color:var(--badk);font-size:14px;min-height:18px}
+#login{min-height:100vh;display:grid;place-items:center;padding:20px}
+#login form{background:#fff;border:1px solid var(--line);border-radius:14px;padding:28px;width:min(380px,100%);display:flex;flex-direction:column;gap:14px}
+#app{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}
+nav{background:var(--brand);color:#fff;display:flex;flex-direction:column;gap:3px;padding:20px 14px;position:sticky;top:0;height:100vh;overflow:auto}
+nav .t{font-size:18px;font-weight:700;padding:0 8px 4px}
+nav .who{font-size:13px;color:#B9DADF;padding:0 8px 14px}
+nav .sec{font-size:12px;color:#9FD0D7;padding:14px 10px 4px;text-transform:uppercase;letter-spacing:.04em}
+nav a{display:flex;align-items:center;min-height:40px;padding:0 12px;border-radius:9px;color:#E1F1F3;text-decoration:none}
+nav a:hover{background:rgba(255,255,255,.1)}
+nav a.on{background:#fff;color:var(--brand);font-weight:700}
+nav .foot{margin-top:auto;padding-top:16px}
+nav .foot button{width:100%;background:none;border:1px solid #6FA9B3;color:#fff;border-radius:8px;min-height:38px;cursor:pointer}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 28px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.top label{flex-direction:row;align-items:center;gap:8px}
+.demo{background:var(--warn);color:var(--warnk);font-size:13px;padding:6px 12px;border-radius:99px}
+main{padding:24px 28px 60px;display:flex;flex-direction:column;gap:18px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.gap{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+.sub{font-size:13px;color:var(--mut)}
+.muni{font-size:15px;font-weight:700;color:var(--brand);padding:14px 0 6px;border-bottom:2px solid var(--brand);margin-bottom:4px;display:flex;justify-content:space-between}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;color:var(--mut);font-size:12px;font-weight:400;padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 8px;border-top:1px solid #EEF2F3;vertical-align:top}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+tr.click{cursor:pointer}tr.click:hover td{background:#F7FAFA}
+.chip{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;white-space:nowrap;margin:1px 2px 1px 0}
+.c-warn{background:var(--warn);color:var(--warnk)}.c-bad{background:var(--bad);color:var(--badk)}
+.c-ok{background:var(--ok);color:var(--brand)}.c-mut{background:#E9ECEE;color:var(--mut)}.c-info{background:#E3EEFB;color:#1B4F8A}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.kpi .l{display:flex;justify-content:space-between;font-size:14px}.kpi b{font-variant-numeric:tabular-nums}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.empty{color:var(--mut);padding:14px 0}
+dialog{border:0;border-radius:16px;padding:0;width:min(760px,96vw);max-height:92vh}
+dialog::backdrop{background:rgba(10,30,36,.45)}
+dialog form,.dlg{padding:22px 24px;display:flex;flex-direction:column;gap:14px}
+.det{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px 16px;font-size:14px}
+.det div span{display:block;font-size:12px;color:var(--mut)}
+.calc td{font-size:15px}.calc input{width:110px;text-align:right}
+.ped{border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:#fff}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--ink);color:#fff;padding:12px 18px;border-radius:10px;z-index:99;max-width:420px}
+@media(max-width:860px){#app{grid-template-columns:1fr}nav{position:static;height:auto;flex-direction:row;flex-wrap:wrap}nav .sec,nav .who{display:none}nav .foot{margin:0;padding:0}main,.top{padding-left:14px;padding-right:14px}}
+</style>
+</head>
+<body>
+
+<div id="login" class="hide">
+  <form id="fLogin">
+    <h1 style="font-size:24px">Vigilância em Saúde</h1><div class="sub">8º Centro Regional de Saúde</div>
+    <div class="sub" id="lDemo"></div>
+    <label>Usuário<input id="lUser" required autocomplete="username" placeholder="nome do município ou regional"></label>
+    <label>Senha<input id="lSenha" type="password" required autocomplete="current-password"></label>
+    <button class="btn" type="submit">Entrar</button>
+    <div class="err" id="lErr"></div>
+  </form>
+</div>
+
+<div id="app" class="hide">
+  <nav>
+    <div class="t">Vigilância em Saúde</div>
+    <div class="who" id="who"></div>
+    <a href="#inicio">Início</a>
+    <div class="sec">Talidomida</div>
+    <a href="#tali-pacientes">Pacientes</a>
+    <a href="#tali-dispensacoes">Dispensações</a>
+    <div class="sec">Pedidos</div>
+    <a href="#ped-trimestral">Pedido Hanseníase</a>
+    <a href="#ped-tb">Pedido Tuberculose</a>
+    <a href="#ped-analise" class="soReg">Análise de pedidos</a>
+    <div class="sec">SINAN</div>
+    <a href="#sinan-mh">Hanseníase</a>
+    <a href="#sinan-tb">Tuberculose</a>
+    <div class="foot"><button id="sair" type="button">Sair</button></div>
+  </nav>
+  <div>
+    <div class="top">
+      <div class="gap"><b id="titulo"></b><span class="demo hide" id="demoTag">Demonstração · dados fictícios</span></div>
+      <label class="soReg">Município
+        <select id="filtro"></select></label>
+    </div>
+    <main id="main"></main>
+  </div>
+</div>
+
+<dialog id="dlg"></dialog>
+
+<script>
+{
+/* ======================= CONFIGURAÇÃO ======================= */
+const SUPABASE_URL = 'https://jctstzxrcdcwfoivuaih.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Jggdtr1Ho685S0I8i1IeYg_idPounAY';   // vazio = modo demonstração
+const DOMINIO = '@8crs.app';       // usuário "breves" vira breves@8crs.app no Supabase
+const REGIONAL = '8° CRS', UF = 'PA';
+const MUNS = ['ANAJÁS', 'BAGRE', 'BREVES', 'CURRALINHO', 'GURUPÁ', 'MELGAÇO', 'PORTEL'];
+/* ============================================================ */
+
+const DEMO = !SUPABASE_KEY;
+const sb = DEMO ? null : supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+const pad = n => String(n).padStart(2, '0');
+const hojeISO = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+const fmtD = iso => iso ? iso.slice(0,10).split('-').reverse().join('/') : '';
+const dias = iso => iso ? Math.floor((Date.now() - new Date(iso + 'T12:00:00')) / 864e5) : null;
+const idade = iso => { if (!iso) return null; const n = new Date(iso + 'T12:00:00'), h = new Date(); let a = h.getFullYear() - n.getFullYear(); if (h < new Date(h.getFullYear(), n.getMonth(), n.getDate())) a--; return a; };
+const MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const munOf = s => { const n = norm(s); return MUNS.find(m => n.includes(norm(m))) || null; };
+function parseD(v) {
+  if (v == null || v === '') return null;
+  if (v instanceof Date && !isNaN(v)) return `${v.getUTCFullYear()}-${pad(v.getUTCMonth()+1)}-${pad(v.getUTCDate())}`;
+  if (typeof v === 'number' && v > 20000 && v < 80000) return parseD(new Date(Math.round((v - 25569) * 864e5)));
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); if (m) { const y = m[3].length === 2 ? '20' + m[3] : m[3]; return `${y}-${pad(m[2])}-${pad(m[1])}`; }
+  const dg = s.replace(/\D/g, ''); if (dg.length === 8) { const d = +dg.slice(0,2), mo = +dg.slice(2,4), y = +dg.slice(4); if (d <= 31 && mo <= 12 && y > 1900) return `${y}-${pad(mo)}-${pad(d)}`; }
+  return null;
+}
+function toast(msg) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.append(t); setTimeout(() => t.remove(), 4200); }
+
+/* ======================= DADOS ======================= */
+const TABELAS = ['tali_pacientes', 'tali_dispensacoes', 'pedidos', 'sinan_casos'];
+let perfil = null, D = {tali_pacientes:[], tali_dispensacoes:[], pedidos:[], sinan_casos:[]}, MEM = null, seq = 1000;
+const isReg = () => perfil === 'REGIONAL';
+const visivel = r => isReg() || r.municipio === perfil;
+
+const db = {
+  async load() {
+    if (DEMO) { for (const t of TABELAS) D[t] = MEM[t].filter(visivel).map(r => ({...r})); return; }
+    for (const t of TABELAS) {
+      let all = [], from = 0;
+      while (true) { const { data, error } = await sb.from(t).select('*').order('id').range(from, from + 999); if (error) throw error; all = all.concat(data); if (data.length < 1000) break; from += 1000; }
+      D[t] = all;
+    }
+  },
+  async insert(t, rows) {
+    rows = [].concat(rows);
+    if (DEMO) { const out = rows.map(r => ({ id: ++seq, criado_em: new Date().toISOString(), ...r })); MEM[t].push(...out); return out; }
+    const { data, error } = await sb.from(t).insert(rows).select(); if (error) throw error; return data;
+  },
+  async update(t, id, patch) {
+    if (DEMO) { Object.assign(MEM[t].find(r => r.id === id), patch); return; }
+    const { error } = await sb.from(t).update(patch).eq('id', id); if (error) throw error;
+  },
+  async del(t, ids) {
+    ids = [].concat(ids); if (!ids.length) return;
+    if (DEMO) { MEM[t] = MEM[t].filter(r => !ids.includes(r.id)); if (t === 'tali_pacientes') MEM.tali_dispensacoes = MEM.tali_dispensacoes.filter(r => !ids.includes(r.paciente_id)); return; }
+    const { error } = await sb.from(t).delete().in('id', ids); if (error) throw error;
+  }
+};
+async function salvar(fn, msg) {
+  try { await fn(); await db.load(); render(); if (msg) toast(msg); return true; }
+  catch (e) { console.error(e); toast('Não foi possível salvar: ' + (e.message || e)); return false; }
+}
+
+/* ======================= LOGIN ======================= */
+async function iniciar() {
+  if (DEMO) { MEM = demoData(); $('lDemo').textContent = 'Modo demonstração: entre com "regional" ou com o nome de um município (ex.: breves). Qualquer senha.'; $('demoTag').classList.remove('hide'); $('login').classList.remove('hide'); return; }
+  const { data } = await sb.auth.getSession();
+  if (data.session) await entrar(); else $('login').classList.remove('hide');
+}
+$('fLogin').addEventListener('submit', async e => {
+  e.preventDefault(); $('lErr').textContent = '';
+  const u = norm($('lUser').value).toLowerCase().replace(/ /g, '');
+  if (DEMO) {
+    perfil = u === 'regional' ? 'REGIONAL' : MUNS.find(m => norm(m).toLowerCase() === u);
+    if (!perfil) { $('lErr').textContent = 'Usuário não encontrado.'; return; }
+    return entrar();
+  }
+  const { error } = await sb.auth.signInWithPassword({ email: u + DOMINIO, password: $('lSenha').value });
+  if (error) { $('lErr').textContent = 'Usuário ou senha incorretos.'; return; }
+  entrar();
+});
+$('sair').addEventListener('click', async () => { if (!DEMO) await sb.auth.signOut(); location.hash = ''; location.reload(); });
+
+async function entrar() {
+  try {
+    if (!DEMO) {
+      const { data: u } = await sb.auth.getUser();
+      const { data, error } = await sb.from('perfis').select('municipio').eq('user_id', u.user.id).single();
+      if (error || !data) { $('login').classList.remove('hide'); $('lErr').textContent = 'Usuário sem perfil cadastrado. Fale com a regional.'; await sb.auth.signOut(); return; }
+      perfil = data.municipio;
+    }
+    await db.load();
+  } catch (e) { console.error(e); $('lErr').textContent = 'Erro ao carregar os dados.'; return; }
+  $('login').classList.add('hide'); $('app').classList.remove('hide');
+  $('who').textContent = isReg() ? 'Regional · vê todos os municípios' : 'Município de ' + perfil;
+  document.querySelectorAll('.soReg').forEach(el => el.classList.toggle('hide', !isReg()));
+  $('filtro').innerHTML = '<option value="">Todos os municípios</option>' + MUNS.map(m => `<option>${m}</option>`).join('');
+  try { $('filtro').value = localStorage.getItem('filtroMun') || ''; } catch (e) {}
+  render();
+}
+$('filtro').addEventListener('change', () => { try { localStorage.setItem('filtroMun', $('filtro').value); } catch (e) {} render(); });
+const filtroMun = () => isReg() ? $('filtro').value : perfil;
+const doFiltro = r => !filtroMun() || r.municipio === filtroMun();
+function porMun(rows, fn, vazio) {
+  if (!rows.length) return `<div class="empty">${vazio}</div>`;
+  if (!isReg() || filtroMun()) return fn(rows);
+  return MUNS.filter(m => rows.some(r => r.municipio === m)).map(m => { const rs = rows.filter(r => r.municipio === m);
+    return `<div class="muni"><span>${m}</span><span class="sub">${rs.length}</span></div>${fn(rs)}`; }).join('');
+}
+const munSelect = (id, val) => isReg()
+  ? `<label>Município<select id="${id}" required>${MUNS.map(m => `<option ${m === (val || filtroMun()) ? 'selected' : ''}>${m}</option>`).join('')}</select></label>`
+  : `<input type="hidden" id="${id}" value="${esc(perfil)}">`;
+
+/* ======================= ROTAS ======================= */
+const ROTAS = {
+  'inicio': ['Início', vInicio], 'tali-pacientes': ['Talidomida · Pacientes', vPacientes], 'tali-dispensacoes': ['Talidomida · Dispensações', vDisp],
+  'ped-trimestral': ['Pedido Hanseníase', vTrimestral], 'ped-tb': ['Pedido Tuberculose', vTrimestralTB], 'ped-analise': ['Análise de pedidos', vAnalise],
+  'sinan-mh': ['SINAN · Hanseníase', () => vSinan('MH')], 'sinan-tb': ['SINAN · Tuberculose', () => vSinan('TB')]
+};
+function render() {
+  let r = location.hash.slice(1); if (!ROTAS[r] || (r === 'ped-analise' && !isReg())) r = 'inicio';
+  document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + r));
+  $('titulo').textContent = ROTAS[r][0];
+  $('main').innerHTML = ROTAS[r][1]();
+}
+window.addEventListener('hashchange', () => { render(); scrollTo(0, 0); });
+
+/* ======================= INÍCIO ======================= */
+function vInicio() {
+  const mes = hojeISO().slice(0, 7);
+  const muns = isReg() ? (filtroMun() ? [filtroMun()] : MUNS) : [perfil];
+  const k = m => {
+    const pac = D.tali_pacientes.filter(p => p.municipio === m && p.ativo).length;
+    const disp = D.tali_dispensacoes.filter(d => d.municipio === m && (d.data || '').startsWith(mes)).length;
+    const ped = D.pedidos.filter(p => p.municipio === m && p.status === 'aberto').length;
+    const casos = D.sinan_casos.filter(c => c.municipio === m);
+    const pm = casos.filter(c => c.agravo === 'MH' && c.situacao !== 'resolvido').length;
+    const pt = casos.filter(c => c.agravo === 'TB' && c.situacao !== 'resolvido').length;
+    const obs = casos.filter(c => c.situacao === (isReg() ? 'corrigido' : 'pendente')).length;
+    return `<div class="kpi"><h3>${m}</h3>
+      <div class="l"><a href="#tali-pacientes">Talidomida: pacientes ativos</a><b>${pac}</b></div>
+      <div class="l"><a href="#tali-dispensacoes">Dispensações em ${MESES[+mes.slice(5) - 1]}</a><b>${disp}</b></div>
+      <div class="l"><a href="#${isReg() ? 'ped-analise' : 'ped-trimestral'}">Pedidos em aberto</a><b>${ped}</b></div>
+      <div class="l"><a href="#sinan-mh">MH: pendências em aberto</a><b>${pm}</b></div>
+      <div class="l"><a href="#sinan-tb">TB: pendências em aberto</a><b>${pt}</b></div>
+      ${obs ? `<span class="chip ${isReg() ? 'c-info' : 'c-bad'}">${obs} ${isReg() ? 'corrigida(s) pelo município, para conferir' : 'pendência(s) para corrigir'}</span>` : ''}</div>`;
+  };
+  return `<div class="sub">${isReg() ? 'Resumo por município. Use o filtro no topo para ver um município só.' : 'Resumo do seu município.'}</div><div class="kpis">${muns.map(k).join('')}</div>`;
+}
+
+/* ======================= TALIDOMIDA · PACIENTES ======================= */
+let verRetirados = false, busca = '';
+function ultimaDisp(pid) { return D.tali_dispensacoes.filter(d => d.paciente_id === pid).map(d => d.data).sort().pop() || null; }
+function vPacientes() {
+  const lista = D.tali_pacientes.filter(doFiltro).filter(p => !!p.ativo !== verRetirados)
+    .filter(p => !busca || norm(p.nome + ' ' + p.cns).includes(norm(busca))).sort((a, b) => a.nome.localeCompare(b.nome));
+  const tab = rs => `<div class="tw"><table><thead><tr><th>Paciente</th><th>Sexo / idade</th><th>Início talidomida</th><th>Última dispensação</th><th>Situação</th><th></th></tr></thead><tbody>${rs.map(p => {
+    const u = ultimaDisp(p.id), i = idade(p.nascimento), ch = [];
+    if (p.sexo === 'F' && i != null && i >= 10 && i <= 55) ch.push('<span class="chip c-warn">Mulher em idade fértil</span>');
+    if (!p.ativo) ch.push(`<span class="chip c-mut">Retirado ${fmtD(p.saida_data)}${p.saida_motivo ? ' · ' + esc(p.saida_motivo) : ''}</span>`);
+    if (p.ativo && !u) ch.push('<span class="chip c-info">Sem dispensação registrada</span>');
+    return `<tr><td><b>${esc(p.nome)}</b><div class="sub">CNS ${esc(p.cns || '—')} · ${esc(p.updt || '')}</div></td>
+      <td>${esc(p.sexo || '')}${i != null ? ' · ' + i + ' anos' : ''}</td><td>${fmtD(p.inicio)}</td>
+      <td>${u ? fmtD(u) + `<div class="sub">há ${dias(u)} dias</div>` : '—'}</td><td>${ch.join('')}</td>
+      <td class="n"><div class="gap" style="justify-content:flex-end">${p.ativo ? `<button class="btn sm" data-a="disp" data-id="${p.id}">Dispensar</button>` : ''}
+        <button class="btn sm sec" data-a="pac" data-id="${p.id}">Editar</button>
+        ${p.ativo ? `<button class="btn sm red" data-a="retirar" data-id="${p.id}">Retirar</button>` : `<button class="btn sm sec" data-a="reativar" data-id="${p.id}">Reativar</button>`}</div></td></tr>`; }).join('')}</tbody></table></div>`;
+  return `<div class="row"><div class="gap"><button class="btn" data-a="pac">Incluir paciente</button>
+      <button class="btn sec" data-a="exportar">Baixar planilha (Excel)</button></div>
+    <div class="gap"><input id="busca" placeholder="Buscar nome ou CNS" value="${esc(busca)}" style="width:220px">
+      <select id="verRet"><option value="0">Em tratamento</option><option value="1" ${verRetirados ? 'selected' : ''}>Retirados</option></select></div></div>
+    <div class="card">${porMun(lista, tab, verRetirados ? 'Nenhum paciente retirado.' : 'Nenhum paciente em tratamento cadastrado.')}</div>`;
+}
+document.addEventListener('change', e => {
+  if (e.target.id === 'verRet') { verRetirados = e.target.value === '1'; render(); }
+  if (e.target.id === 'mesDisp') { mesDisp = e.target.value || hojeISO().slice(0, 7); render(); }
+  if (e.target.id === 'stPed') { stPed = e.target.value; render(); }
+  if (e.target.id === 'refCons') { refCons = e.target.value; render(); }
+  if (e.target.id === 'refTB') { refTB = e.target.value; render(); }
+  if (e.target.id === 'filtroSit') { filtroSit = e.target.value; render(); }
+  if (e.target.id === 'bEsq') { const mun = $('bMun').value, ref = $('bRef').value, mod = $('bMod').value; esqTB = e.target.value; render(); $('bMun').value = mun; $('bRef').value = ref; $('bMod').value = mod; }
+  if (e.target.id === 'impTali') importarTali(e.target.files[0]);
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'busca') { busca = e.target.value; clearTimeout(window._bt); window._bt = setTimeout(() => { render(); const b = $('busca'); b.focus(); b.setSelectionRange(b.value.length, b.value.length); }, 300); }
+  if (e.target.closest('#fTri')) calcTri();
+  if (e.target.closest('#fTB')) calcTB();
+});
+
+const PAC_CAMPOS = [['nome','Nome do usuário',1],['cns','Número cartão SUS'],['rg','Documento de identificação (RG)'],['sexo','Sexo','sexo'],['nascimento','Data de nascimento','date'],
+  ['mae','Nome da mãe'],['endereco','Endereço de residência'],['telefone','Telefone'],['updt','Nome UPDT'],['cnes','CNES'],['cid','CID-10'],['inicio','Data início do tratamento com talidomida','date'],
+  ['medico','Nome médico(a) prescritor(a)'],['crm','Número CRM']];
+function formPaciente(p) {
+  p = p || { cid: 'A30.9', sexo: '' };
+  dlg(`<form id="fPac"><h2>${p.id ? 'Editar paciente' : 'Incluir paciente'}</h2><div class="grid">${munSelect('pMun', p.municipio)}
+    ${PAC_CAMPOS.map(([k, l, t]) => t === 'sexo' ? `<label>${l}<select id="p_${k}"><option value=""></option><option ${p[k] === 'F' ? 'selected' : ''}>F</option><option ${p[k] === 'M' ? 'selected' : ''}>M</option></select></label>`
+      : `<label>${l}<input id="p_${k}" ${t === 'date' ? 'type="date"' : ''} ${t === 1 ? 'required' : ''} value="${esc(p[k] || '')}"></label>`).join('')}</div>
+    <div class="row"><span class="err" id="pErr"></span><div class="gap"><button type="button" class="btn sec" data-a="fechar">Cancelar</button><button class="btn">Salvar</button></div></div></form>`);
+  $('fPac').onsubmit = async e => { e.preventDefault();
+    const r = { municipio: $('pMun').value }; PAC_CAMPOS.forEach(([k]) => r[k] = $('p_' + k).value.trim() || null);
+    const dup = D.tali_pacientes.find(x => x.id !== p.id && r.cns && x.cns && x.cns.replace(/\D/g, '') === r.cns.replace(/\D/g, ''));
+    if (dup) { $('pErr').textContent = 'Já existe paciente com esse CNS: ' + dup.nome + ' (' + dup.municipio + ').'; return; }
+    if (await salvar(() => p.id ? db.update('tali_pacientes', p.id, r) : db.insert('tali_pacientes', { ...r, ativo: true }), 'Paciente salvo.')) $('dlg').close(); };
+}
+function formRetirar(p) {
+  dlg(`<form id="fRet"><h2>Retirar ${esc(p.nome)}</h2><div class="sub">O paciente sai da lista em tratamento, mas o histórico de dispensações continua na planilha.</div>
+    <div class="grid"><label>Motivo<select id="rMot"><option>Fim do tratamento com talidomida</option><option>Alta por cura</option><option>Transferência</option><option>Óbito</option><option>Abandono</option><option>Outro</option></select></label>
+    <label>Data<input type="date" id="rData" value="${hojeISO()}" required></label></div>
+    <div class="row"><span></span><div class="gap"><button type="button" class="btn sec" data-a="fechar">Cancelar</button><button class="btn">Retirar</button></div></div></form>`);
+  $('fRet').onsubmit = async e => { e.preventDefault();
+    if (await salvar(() => db.update('tali_pacientes', p.id, { ativo: false, saida_motivo: $('rMot').value, saida_data: $('rData').value }), 'Paciente retirado da lista.')) $('dlg').close(); };
+}
+
+/* ======================= TALIDOMIDA · DISPENSAÇÕES ======================= */
+let mesDisp = hojeISO().slice(0, 7);
+const DISP_CAMPOS = [['data','Data da dispensação','date',1],['quantidade','Quantidade dispensada','number',1],['lote','Lote'],['validade','Data de validade','date'],
+  ['receita','Nº da notificação da receita'],['medico','Médico(a) prescritor(a)'],['crm','CRM'],['farmaceutico','Farmacêutico(a) responsável'],['crf','CRF']];
+function vDisp() {
+  const pac = id => D.tali_pacientes.find(p => p.id === id) || {};
+  const lista = D.tali_dispensacoes.filter(doFiltro).filter(d => (d.data || '').startsWith(mesDisp)).sort((a, b) => a.data.localeCompare(b.data));
+  const tab = rs => `<div class="tw"><table><thead><tr><th>Data</th><th>Paciente</th><th class="n">Qtd.</th><th>Lote / validade</th><th>Receita</th><th>Prescritor</th><th>Farmacêutico</th><th></th></tr></thead><tbody>${rs.map(d => `<tr>
+    <td>${fmtD(d.data)}</td><td><b>${esc(pac(d.paciente_id).nome)}</b></td><td class="n">${d.quantidade ?? ''}</td><td>${esc(d.lote || '')}<div class="sub">${fmtD(d.validade)}</div></td>
+    <td>${esc(d.receita || '')}</td><td>${esc(d.medico || '')}<div class="sub">${esc(d.crm || '')}</div></td><td>${esc(d.farmaceutico || '')}<div class="sub">${esc(d.crf || '')}</div></td>
+    <td class="n"><div class="gap" style="justify-content:flex-end"><button class="btn sm sec" data-a="editDisp" data-id="${d.id}">Editar</button><button class="btn sm red" data-a="delDisp" data-id="${d.id}">Excluir</button></div></td></tr>`).join('')}</tbody></table></div>`;
+  const [y, m] = mesDisp.split('-');
+  return `<div class="row"><div class="gap"><button class="btn" data-a="disp">Registrar dispensação</button><button class="btn sec" data-a="exportar">Baixar planilha (Excel)</button>
+      ${isReg() ? `<label class="btn sec" style="display:inline-flex;align-items:center;flex-direction:row;font-size:15px">Importar planilha antiga<input type="file" id="impTali" accept=".xlsx" class="hide"></label>` : ''}</div>
+    <label style="flex-direction:row;align-items:center;gap:8px">Mês<input type="month" id="mesDisp" value="${mesDisp}"></label></div>
+    <div class="card"><div class="row" style="padding-bottom:6px"><h2>Dispensações de ${MESES[+m - 1]} de ${y}</h2><span class="sub">${lista.length} registro(s) · ${lista.reduce((s, d) => s + (+d.quantidade || 0), 0)} comprimidos</span></div>
+    ${porMun(lista, tab, 'Nenhuma dispensação registrada neste mês. Na planilha, o mês sai como "Sem dispensações relatadas pelo município".')}</div>`;
+}
+function formDisp(pid, d) {
+  const ativos = D.tali_pacientes.filter(p => p.ativo && doFiltro(p)).sort((a, b) => a.nome.localeCompare(b.nome));
+  if (!d && !ativos.length) { toast('Cadastre o paciente primeiro, em Talidomida › Pacientes.'); return; }
+  const anterior = id => D.tali_dispensacoes.filter(x => x.paciente_id === id).sort((a, b) => a.data.localeCompare(b.data)).pop();
+  const base = d || (() => { const p = D.tali_pacientes.find(x => x.id === (pid || ativos[0].id)), a = anterior(p.id) || {};
+    return { paciente_id: p.id, data: hojeISO(), quantidade: a.quantidade || 30, lote: a.lote, validade: a.validade, medico: a.medico || p.medico, crm: a.crm || p.crm, farmaceutico: a.farmaceutico, crf: a.crf }; })();
+  const pacOpts = (d ? D.tali_pacientes.filter(p => p.id === d.paciente_id) : ativos).map(p => `<option value="${p.id}" ${p.id === base.paciente_id ? 'selected' : ''}>${esc(p.nome)} · ${p.municipio}</option>`).join('');
+  dlg(`<form id="fDisp"><h2>${d ? 'Editar dispensação' : 'Registrar dispensação'}</h2>
+    <label>Paciente<select id="dPac" ${d ? 'disabled' : ''}>${pacOpts}</select></label>
+    <div class="grid">${DISP_CAMPOS.map(([k, l, t, r]) => `<label>${l}<input id="d_${k}" ${t ? `type="${t}"` : ''} ${r ? 'required' : ''} value="${esc(base[k] ?? '')}"></label>`).join('')}</div>
+    <div class="sub">Lote, validade, prescritor e farmacêutico vêm preenchidos com a última dispensação do paciente. Confira antes de salvar.</div>
+    <div class="row"><span></span><div class="gap"><button type="button" class="btn sec" data-a="fechar">Cancelar</button><button class="btn">Salvar</button></div></div></form>`);
+  if (!d) $('dPac').onchange = () => { $('dlg').close(); formDisp(+$('dPac').value); };
+  $('fDisp').onsubmit = async e => { e.preventDefault();
+    const p = D.tali_pacientes.find(x => x.id === +$('dPac').value), r = {};
+    DISP_CAMPOS.forEach(([k, , t]) => { const v = $('d_' + k).value.trim(); r[k] = v === '' ? null : t === 'number' ? +v : v; });
+    if (await salvar(() => d ? db.update('tali_dispensacoes', d.id, r) : db.insert('tali_dispensacoes', { ...r, paciente_id: p.id, municipio: p.municipio }), 'Dispensação salva.')) { $('dlg').close(); mesDisp = r.data.slice(0, 7); render(); } };
+}
+
+/* ---------- planilha no modelo oficial ---------- */
+const COLS = ['UNIDADE FEDERATIVA','MUNICÍPIO','REGIONAL DE SAÚDE','NOME UPDT','CNES','NOME DO USUÁRIO','NÚMERO CARTÃO SUS','DOCUMENTO DE IDENTIFICAÇÃO (RG)','SEXO','DATA DE NASCIMENTO',
+  'NOME DA MÃE','ENDEREÇO DE RESIDÊNCIA','TELEFONE','DATA DA DISPENSAÇÃO','QUANTIDADE DISPENSADA','LOTE','DATA DE VALIDADE','NÚMERO DA NOTIFICAÇÃO\nDA RECEITA DE TALIDOMIDA','CID-10',
+  'DATA INÍCIO DO TRATAMENTO COM TALIDOMIDA','NOME MÉDICO(A) PRESCRITOR(A)','NÚMERO CRM','NOME FARMACÊUTICO(A)\nRESPONSÁVEL PELA DISPENSAÇÃO','NÚMERO CRF'];
+const LARG = [11,16,12,12,10,34,22,16,7,13,30,36,15,14,13,12,13,18,9,16,30,15,30,14];
+function formExportar() {
+  const anos = [...new Set(D.tali_dispensacoes.map(d => (d.data || '').slice(0, 4)).filter(Boolean).concat(hojeISO().slice(0, 4)))].sort().reverse();
+  dlg(`<form id="fExp"><h2>Baixar planilha de talidomida</h2><div class="sub">Sai no modelo oficial: uma aba por mês (01 a 12), com as dispensações de cada mês.</div>
+    <div class="grid"><label>Ano<select id="eAno">${anos.map(a => `<option>${a}</option>`).join('')}</select></label>
+    ${isReg() ? `<label>Municípios<select id="eMun"><option value="">Todos</option>${MUNS.map(m => `<option ${m === filtroMun() ? 'selected' : ''}>${m}</option>`).join('')}</select></label>` : ''}</div>
+    <div class="row"><span class="err" id="eErr"></span><div class="gap"><button type="button" class="btn sec" data-a="fechar">Cancelar</button><button class="btn">Baixar</button></div></div></form>`);
+  $('fExp').onsubmit = async e => { e.preventDefault(); try { await exportarTali($('eAno').value, isReg() ? $('eMun').value : perfil); $('dlg').close(); } catch (er) { console.error(er); $('eErr').textContent = 'Não foi possível gerar a planilha.'; } };
+}
+async function exportarTali(ano, mun) {
+  const wb = new ExcelJS.Workbook(), dt = iso => iso ? new Date(iso + 'T12:00:00') : null;
+  const borda = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+  for (let m = 1; m <= 12; m++) {
+    const ws = wb.addWorksheet(pad(m));
+    ws.columns = LARG.map(w => ({ width: w }));
+    ws.mergeCells('A2:X2');
+    const t = ws.getCell('A2'); t.value = 'Dispensação do mês anterior da Talidomida para ENH (Eritema Nodoso Hansênico)';
+    t.font = { bold: true, size: 13 }; t.alignment = { horizontal: 'center' };
+    const h = ws.getRow(3); h.values = COLS; h.height = 45;
+    h.eachCell(c => { c.font = { bold: true, size: 9 }; c.alignment = { wrapText: true, vertical: 'middle', horizontal: 'center' }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } }; c.border = borda; });
+    const ds = D.tali_dispensacoes.filter(d => (d.data || '').startsWith(`${ano}-${pad(m)}`) && (!mun || d.municipio === mun)).sort((a, b) => a.municipio.localeCompare(b.municipio) || a.data.localeCompare(b.data));
+    if (!ds.length) { ws.getCell('F4').value = 'SEM DISPENSAÇÕES RELATADAS PELO MUNICÍPIO'; continue; }
+    ds.forEach((d, i) => {
+      const p = D.tali_pacientes.find(x => x.id === d.paciente_id) || {};
+      const r = ws.getRow(4 + i);
+      r.values = [UF, d.municipio, REGIONAL, p.updt, p.cnes, p.nome, p.cns, p.rg, p.sexo, dt(p.nascimento), p.mae, p.endereco, p.telefone, dt(d.data), d.quantidade, d.lote, dt(d.validade),
+        d.receita, p.cid, dt(p.inicio), d.medico || p.medico, d.crm || p.crm, d.farmaceutico, d.crf].map(v => v ?? null);
+      r.eachCell({ includeEmpty: true }, (c, n) => { if (n <= 24) { c.border = borda; c.font = { size: 10 }; if (c.value instanceof Date) c.numFmt = 'dd/mm/yyyy'; } });
+    });
+  }
+  const buf = await wb.xlsx.writeBuffer();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  a.download = `Lista_Pacientes_Talidomida_${mun ? norm(mun).replace(/ /g, '_') + '_' : ''}${ano}.xlsx`; document.body.append(a); a.click(); a.remove();
+  if (DEMO) toast('No modo demonstração dentro do Claude o download pode ser bloqueado. No site publicado funciona.');
+}
+const cv = v => { if (v && typeof v === 'object' && !(v instanceof Date)) { if (v.richText) return v.richText.map(t => t.text).join(''); if ('result' in v) return v.result; if (v.text) return v.text; } return v; };
+const txt = v => { v = cv(v); return v == null || v === '' ? null : String(v instanceof Date ? parseD(v) : v).trim(); };
+async function importarTali(file) {
+  if (!file) return;
+  try {
+    const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer());
+    const novosP = [], novasD = [], semData = [], semMun = new Set(); let lidas = 0;
+    const chave = (cns, nome) => (cns || '').replace(/\D/g, '') || norm(nome);
+    const existentes = new Map(D.tali_pacientes.map(p => [chave(p.cns, p.nome), p]));
+    for (const ws of wb.worksheets) {
+      if (!/^\d{1,2}$/.test(ws.name.trim())) continue;
+      const last = Math.min(ws.actualRowCount + 5, 2000);
+      for (let i = 4; i <= last; i++) {
+        const row = ws.getRow(i), c = n => cv(row.getCell(n).value);
+        const nome = txt(c(6)); if (!nome || norm(nome).startsWith('SEM DISP')) continue;
+        lidas++;
+        const mun = munOf(txt(c(2)) || ''); if (!mun) { semMun.add(txt(c(2)) || '(vazio)'); continue; }
+        const k = chave(txt(c(7)), nome);
+        let p = existentes.get(k);
+        if (!p) { p = { _k: k, municipio: mun, updt: txt(c(4)), cnes: txt(c(5)), nome, cns: txt(c(7)), rg: txt(c(8)), sexo: (txt(c(9)) || '').slice(0, 1).toUpperCase() || null, nascimento: parseD(c(10)),
+          mae: txt(c(11)), endereco: txt(c(12)), telefone: txt(c(13)), cid: txt(c(19)), inicio: parseD(c(20)), medico: txt(c(21)), crm: txt(c(22)), ativo: true }; existentes.set(k, p); novosP.push(p); }
+        const data = parseD(c(14));
+        if (!data) { semData.push(`aba ${ws.name}, linha ${i}: ${nome}`); continue; }
+        novasD.push({ _k: k, municipio: p.municipio, data, quantidade: parseInt(txt(c(15))) || null, lote: txt(c(16)), validade: parseD(c(17)), receita: txt(c(18)),
+          medico: txt(c(21)), crm: txt(c(22)), farmaceutico: txt(c(23)), crf: txt(c(24)) });
+      }
+    }
+    const jaD = new Set(D.tali_dispensacoes.map(d => d.paciente_id + '|' + d.data + '|' + d.quantidade));
+    const dup = novasD.filter(d => { const p = existentes.get(d._k); return p && p.id && jaD.has(p.id + '|' + d.data + '|' + d.quantidade); }).length;
+    const resumo = `${lidas} linha(s) lidas · ${novosP.length} paciente(s) novos · ${novasD.length - dup} dispensação(ões) novas` + (dup ? ` · ${dup} já cadastrada(s), serão ignoradas` : '') + (semData.length ? ` · ${semData.length} sem data legível` : '') + (semMun.size ? ` · município não reconhecido: ${[...semMun].join(', ')}` : '');
+    dlg(`<div class="dlg"><h2>Importar planilha antiga</h2><div>${esc(resumo)}</div>
+      ${semData.length ? `<div class="sub">Linhas com data da dispensação que não deu para ler (corrija na planilha ou cadastre à mão depois):<br>${semData.slice(0, 15).map(esc).join('<br>')}${semData.length > 15 ? '<br>…' : ''}</div>` : ''}
+      <div class="sub">Pacientes repetidos são reconhecidos pelo CNS (ou pelo nome, quando não há CNS). Dispensações iguais já cadastradas não são duplicadas.</div>
+      <div class="row"><span></span><div class="gap"><button class="btn sec" data-a="fechar">Cancelar</button><button class="btn" id="impOk">Importar</button></div></div></div>`);
+    $('impOk').onclick = async () => { $('impOk').disabled = true;
+      const ok = await salvar(async () => {
+        const criados = novosP.length ? await db.insert('tali_pacientes', novosP.map(({ _k, ...p }) => p)) : [];
+        const ids = new Map(D.tali_pacientes.map(p => [chave(p.cns, p.nome), p.id])); criados.forEach(p => ids.set(chave(p.cns, p.nome), p.id));
+        const ja = new Set(D.tali_dispensacoes.map(d => d.paciente_id + '|' + d.data + '|' + d.quantidade));
+        const rows = novasD.map(({ _k, ...d }) => ({ ...d, paciente_id: ids.get(_k) })).filter(d => d.paciente_id && !ja.has(d.paciente_id + '|' + d.data + '|' + d.quantidade));
+        for (let i = 0; i < rows.length; i += 200) await db.insert('tali_dispensacoes', rows.slice(i, i + 200));
+      }, 'Planilha importada.');
+      if (ok) $('dlg').close(); };
+  } catch (e) { console.error(e); toast('Não foi possível ler a planilha. Confira se é o arquivo .xlsx no modelo oficial.'); }
+}
+
+/* ======================= PEDIDOS ======================= */
+const modSel = id => `<label>Tipo de pedido<select id="${id}"><option value="trimestral">Pedido trimestral</option><option value="extra">Pedido extra</option></select></label>`;
+const CATS = [['pb_m15','Paucibacilar · menor de 15 anos'],['pb_15','Paucibacilar · 15 anos ou mais'],['mb_m15','Multibacilar · menor de 15 anos'],['mb_15','Multibacilar · 15 anos ou mais']];
+const ST = { aberto: ['Em aberto','c-warn'], integral: ['Atendido integral','c-ok'], parcial: ['Atendido parcial','c-info'], nao: ['Não atendido','c-bad'] };
+const chipSt = s => `<span class="chip ${ST[s][1]}">${ST[s][0]}</span>`;
+function trimestres() { const d = new Date(); let y = d.getFullYear(), q = Math.floor(d.getMonth() / 3) + 1; const out = [];
+  for (let i = 0; i < 4; i++) { out.push(`${q}º trimestre de ${y}`); if (++q > 4) { q = 1; y++; } } return out; }
+function itensHtml(p) {
+  if (p.tipo === 'trimestral') return `<table class="calc"><thead><tr><th>Categoria</th><th class="n">Pacientes</th><th class="n">Pedido (× 3 meses)</th></tr></thead><tbody>${CATS.map(([k, l]) =>
+    `<tr><td>${l}</td><td class="n">${p.itens[k] || 0}</td><td class="n"><b>${(p.itens[k] || 0) * 3}</b></td></tr>`).join('')}
+    <tr><td><b>Total</b></td><td class="n"><b>${CATS.reduce((s, [k]) => s + (+p.itens[k] || 0), 0)}</b></td><td class="n"><b>${CATS.reduce((s, [k]) => s + (+p.itens[k] || 0) * 3, 0)}</b></td></tr></tbody></table>`;
+  if (p.tipo === 'trimestral_tb') { const it = p.itens, e = ESQ[it.esquema];
+    const fx = e.fases.map(fa => fa.f.filter(([k]) => it.n[k]).map(([k, l]) => `${fa.t.split(' ·')[0]} · ${l}: <b>${it.n[k]}</b>`)).flat();
+    return `<table><thead><tr><th>Medicamento</th><th class="n">Total</th><th class="n">Estoque</th><th>Validade</th><th class="n">Solicitado</th></tr></thead><tbody>${medsDe(it.esquema).filter(m => it.tot[m] || it.est[m]).map(m =>
+      `<tr><td>${MED[m]}</td><td class="n">${it.tot[m] || 0}</td><td class="n">${it.est[m] || 0}</td><td>${fmtD(it.val[m])}</td><td class="n"><b>${it.sol[m] || 0}</b></td></tr>`).join('')}</tbody></table>
+      <details style="padding-top:6px"><summary class="sub" style="cursor:pointer">Pacientes por faixa de peso</summary><div class="sub" style="padding-top:4px">${fx.join('<br>')}</div></details>`; }
+  return `<table><thead><tr><th>Medicamento</th><th class="n">Quantidade</th></tr></thead><tbody>${(p.itens.lista || []).map(i => `<tr><td>${esc(i.med)}</td><td class="n"><b>${i.qtd}</b></td></tr>`).join('')}</tbody></table>`;
+}
+function cardPed(p, acoes) {
+  return `<div class="ped"><div class="row"><div><b>${(p.modalidade === 'extra' ? 'Pedido extra ' : 'Pedido trimestral ') + (p.tipo === 'trimestral_tb' ? 'TB' : 'MH') + ' · ' + esc(p.referencia || '') + (p.tipo === 'trimestral_tb' ? ' · ' + ESQ[p.itens.esquema].nome : '')}</b>${p.modalidade === 'extra' ? ' <span class="chip c-info">Extra</span>' : ''}
+      <div class="sub">${isReg() ? p.municipio + ' · ' : ''}enviado em ${fmtD((p.criado_em || '').slice(0, 10))}${p.analisado_em ? ' · analisado em ' + fmtD(p.analisado_em.slice(0, 10)) : ''}</div></div>${chipSt(p.status)}</div>
+    <div class="tw">${itensHtml(p)}</div>${p.obs ? `<div><span class="sub">Observação da regional:</span> ${esc(p.obs)}</div>` : ''}${acoes || ''}</div>`;
+}
+function historico(tipo) {
+  const ps = D.pedidos.filter(p => p.tipo === tipo).filter(doFiltro).sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || ''));
+  return `<div class="card"><h2 style="padding-bottom:10px">Pedidos enviados</h2>${porMun(ps, rs => `<div style="display:flex;flex-direction:column;gap:12px">${rs.map(p => cardPed(p,
+    p.status === 'aberto' ? `<div><button class="btn sm red" data-a="delPed" data-id="${p.id}">Cancelar pedido</button></div>` : '')).join('')}</div>`, 'Nenhum pedido enviado.')}</div>`;
+}
+function vTrimestral() {
+  return `<form class="card" id="fTri" style="display:flex;flex-direction:column;gap:14px"><h2>Novo pedido de hanseníase</h2>
+    <div class="grid">${munSelect('tMun')}${modSel('tMod')}<label>Trimestre<select id="tRef">${trimestres().map(t => `<option>${t}</option>`).join('')}</select></label></div>
+    <div class="tw"><table class="calc"><thead><tr><th>Categoria</th><th class="n">Pacientes em tratamento</th><th class="n">Pedido (× 3 meses)</th></tr></thead><tbody>
+    ${CATS.map(([k, l]) => `<tr><td>${l}</td><td class="n"><input type="number" min="0" id="t_${k}" value="0"></td><td class="n"><b id="r_${k}">0</b></td></tr>`).join('')}
+    <tr><td><b>Total</b></td><td class="n"><b id="tTot">0</b></td><td class="n"><b id="rTot">0</b></td></tr></tbody></table></div>
+    <div class="row"><span class="sub">O pedido fica em aberto até a regional analisar.</span><button class="btn">Enviar pedido</button></div></form>${historico('trimestral')}`;
+}
+function calcTri() { let t = 0; CATS.forEach(([k]) => { const v = Math.max(0, +$('t_' + k).value || 0); t += v; $('r_' + k).textContent = v * 3; }); $('tTot').textContent = t; $('rTot').textContent = t * 3; }
+/* ---------- pedido trimestral de tuberculose (modelo da Coordenação Estadual) ---------- */
+const MED = { RHZE: 'RHZE 150/75/400/275 mg', RH300: 'RH 300/150 mg', RH150: 'RH 150/75 mg', RHZ: 'RHZ 75/50/150 mg', RH75: 'RH 75/50 mg',
+  RIFS: 'Rifampicina 20 mg/mL (suspensão)', RIF300: 'Rifampicina 300 mg', INH100: 'Isoniazida 100 mg', PZA150: 'Pirazinamida 150 mg', PZA500: 'Pirazinamida 500 mg' };
+const faseAdulto = p => [
+  { t: 'Fase I · 2 meses (RHZE 150/75/400/275 mg)', f: [[p + '1a', 'Mais de 70 kg (5 comp/dia)', [['RHZE', 300]]], [p + '1b', '51 a 70 kg (4 comp/dia)', [['RHZE', 240]]],
+    [p + '1c', '36 a 50 kg (3 comp/dia)', [['RHZE', 180]]], [p + '1d', '20 a 35 kg (2 comp/dia)', [['RHZE', 120]]]] },
+  { t: 'Fase II · 3 meses (RH 300/150 mg + RH 150/75 mg)', f: [[p + '2a', 'Mais de 70 kg (2 RH 300/150 + 1 RH 150/75)', [['RH300', 180], ['RH150', 90]]],
+    [p + '2b', '51 a 70 kg (2 RH 300/150)', [['RH300', 180]]], [p + '2c', '36 a 50 kg (1 RH 300/150 + 1 RH 150/75)', [['RH300', 90], ['RH150', 90]]], [p + '2d', '20 a 35 kg (1 RH 300/150)', [['RH300', 90]]]] }];
+const ESQ = {
+  basico: { nome: 'Esquema básico · adultos e adolescentes > 10 anos', fases: faseAdulto('b') },
+  osteo: { nome: 'Esquema TB meningoencefálica e osteoarticular', fases: faseAdulto('o') },
+  infantil: { nome: 'Esquema infantil · crianças < 10 anos', fases: [
+    { t: 'Fase I · 2 meses', f: [['i1a', '4 a 7 kg (1 comp)', [['RHZ', 60]]], ['i1b', '8 a 11 kg (2 comp)', [['RHZ', 120]]], ['i1c', '12 a 15 kg (3 comp)', [['RHZ', 180]]], ['i1d', '16 a 24 kg (4 comp)', [['RHZ', 240]]],
+      ['i1e', '25 a 30 kg', [['RIFS', 28], ['INH100', 180], ['PZA150', 360]]], ['i1f', '31 a 35 kg', [['RIFS', 30], ['INH100', 180], ['PZA150', 420]]],
+      ['i1g', '36 a 45 kg', [['RIF300', 120], ['INH100', 180], ['PZA500', 180]]], ['i1h', '45 kg ou mais', [['RIF300', 120], ['INH100', 180], ['PZA500', 240]]]] },
+    { t: 'Fase II · 3 meses', f: [['i2a', '4 a 7 kg (1 comp)', [['RH75', 90]]], ['i2b', '8 a 11 kg (2 comp)', [['RH75', 180]]], ['i2c', '12 a 15 kg (3 comp)', [['RH75', 270]]], ['i2d', '16 a 24 kg (4 comp)', [['RH75', 360]]],
+      ['i2e', '25 a 30 kg', [['RIFS', 42], ['INH100', 270]]], ['i2f', '31 a 35 kg', [['RIFS', 46], ['INH100', 270]]], ['i2g', '36 a 45 kg ou mais', [['RIF300', 180], ['INH100', 270]]]] }] }
+};
+let esqTB = 'basico';
+function totaisTB(esq, n) { const t = {}; ESQ[esq].fases.forEach(fa => fa.f.forEach(([k, , its]) => its.forEach(([m, x]) => t[m] = (t[m] || 0) + (+n[k] || 0) * x))); return t; }
+const medsDe = esq => [...new Set(ESQ[esq].fases.flatMap(fa => fa.f.flatMap(([, , its]) => its.map(([m]) => m))))];
+function vTrimestralTB() {
+  const e = ESQ[esqTB];
+  return `<form class="card" id="fTB" style="display:flex;flex-direction:column;gap:16px"><h2>Novo pedido de tuberculose</h2>
+    <div class="grid">${munSelect('bMun')}${modSel('bMod')}<label>Trimestre<select id="bRef">${trimestres().map(t => `<option>${t}</option>`).join('')}</select></label>
+      <label>Esquema<select id="bEsq">${Object.entries(ESQ).map(([k, v]) => `<option value="${k}" ${k === esqTB ? 'selected' : ''}>${v.nome}</option>`).join('')}</select></label></div>
+    ${e.fases.map(fa => `<div><h3 style="padding-bottom:6px">${fa.t}</h3><div class="tw"><table class="calc"><thead><tr><th>Faixa de peso</th><th class="n">Nº de pacientes</th><th>Medicamento</th><th class="n">Base</th><th class="n">Total parcial</th></tr></thead><tbody>
+      ${fa.f.map(([k, l, its]) => its.map(([m, x], i) => `<tr>${i ? '' : `<td rowspan="${its.length}">${l}</td><td class="n" rowspan="${its.length}"><input type="number" min="0" id="tb_${k}" value="0"></td>`}
+        <td>${MED[m]}</td><td class="n">× ${x}</td><td class="n"><b id="tp_${k}_${m}">0</b></td></tr>`).join('')).join('')}</tbody></table></div></div>`).join('')}
+    ${esqTB !== 'infantil' ? '<div class="sub">Lembrete: pacientes que iniciam o tratamento e entram no pedido ainda na Fase I devem ser contados também na Fase II, garantindo o medicamento do 3º mês.</div>' : ''}
+    <div><h3 style="padding-bottom:6px">Consolidado</h3><div class="tw"><table class="calc"><thead><tr><th>Medicamento</th><th class="n">Total</th><th class="n">Estoque</th><th>Validade</th><th class="n">Solicitado</th></tr></thead><tbody>
+      ${medsDe(esqTB).map(m => `<tr><td>${MED[m]}</td><td class="n"><b id="tt_${m}">0</b></td><td class="n"><input type="number" min="0" id="te_${m}" value="0"></td><td><input type="date" id="tv_${m}"></td><td class="n"><b id="ts_${m}">0</b></td></tr>`).join('')}
+    </tbody></table></div><div class="sub" style="padding-top:6px">Solicitado = total − estoque.</div></div>
+    <div class="row"><span class="sub">O pedido fica em aberto até a regional analisar. Se o município usa mais de um esquema, envie um pedido para cada esquema.</span><button class="btn">Enviar pedido</button></div></form>${historico('trimestral_tb')}`;
+}
+function lerTB() {
+  const n = {}; ESQ[esqTB].fases.forEach(fa => fa.f.forEach(([k]) => n[k] = Math.max(0, +$('tb_' + k).value || 0)));
+  const tot = totaisTB(esqTB, n), est = {}, val = {}, sol = {};
+  medsDe(esqTB).forEach(m => { est[m] = Math.max(0, +$('te_' + m).value || 0); val[m] = $('tv_' + m).value || null; sol[m] = Math.max(0, (tot[m] || 0) - est[m]); });
+  return { n, tot, est, val, sol };
+}
+function calcTB() {
+  const r = lerTB();
+  ESQ[esqTB].fases.forEach(fa => fa.f.forEach(([k, , its]) => its.forEach(([m, x]) => $(`tp_${k}_${m}`).textContent = r.n[k] * x)));
+  medsDe(esqTB).forEach(m => { $('tt_' + m).textContent = r.tot[m] || 0; $('ts_' + m).textContent = r.sol[m]; });
+}
+
+document.addEventListener('submit', async e => {
+  if (e.target.id === 'fTri') { e.preventDefault(); const it = {}; CATS.forEach(([k]) => it[k] = Math.max(0, +$('t_' + k).value || 0));
+    if (!Object.values(it).some(v => v)) { toast('Informe ao menos um paciente.'); return; }
+    await salvar(() => db.insert('pedidos', { municipio: $('tMun').value, tipo: 'trimestral', modalidade: $('tMod').value, referencia: $('tRef').value, agravo: 'MH', itens: it, status: 'aberto' }), 'Pedido enviado à regional.'); }
+  if (e.target.id === 'fTB') { e.preventDefault(); const r = lerTB();
+    if (!Object.values(r.n).some(v => v)) { toast('Informe ao menos um paciente.'); return; }
+    await salvar(() => db.insert('pedidos', { municipio: $('bMun').value, tipo: 'trimestral_tb', modalidade: $('bMod').value, referencia: $('bRef').value, agravo: 'TB', itens: { esquema: esqTB, ...r }, status: 'aberto' }), 'Pedido de TB enviado à regional.'); }
+});
+let stPed = 'aberto', refCons = '';
+function vAnalise() {
+  const ps = D.pedidos.filter(doFiltro).filter(p => !stPed || p.status === stPed).sort((a, b) => (a.criado_em || '').localeCompare(b.criado_em || ''));
+  const acoes = p => `<div class="gap"><input id="obs_${p.id}" placeholder="Observação (opcional)" value="${esc(p.obs || '')}" style="flex:1 1 260px">
+    <button class="btn sm" data-a="st" data-st="integral" data-id="${p.id}">Atendido integral</button><button class="btn sm sec" data-a="st" data-st="parcial" data-id="${p.id}">Atendido parcial</button>
+    <button class="btn sm red" data-a="st" data-st="nao" data-id="${p.id}">Não atendido</button>${p.status !== 'aberto' ? `<button class="btn sm sec" data-a="st" data-st="aberto" data-id="${p.id}">Reabrir</button>` : ''}</div>`;
+  const refs = [...new Set(D.pedidos.filter(p => p.tipo === 'trimestral' && p.modalidade !== 'extra').map(p => p.referencia))];
+  if (!refs.includes(refCons)) refCons = refs[0] || '';
+  const cons = D.pedidos.filter(p => p.tipo === 'trimestral' && p.modalidade !== 'extra' && p.referencia === refCons);
+  const ult = m => cons.filter(p => p.municipio === m).sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || ''))[0];
+  return `<div class="row"><label style="flex-direction:row;align-items:center;gap:8px">Situação<select id="stPed"><option value="aberto">Em aberto</option><option value="integral" ${stPed === 'integral' ? 'selected' : ''}>Atendido integral</option>
+    <option value="parcial" ${stPed === 'parcial' ? 'selected' : ''}>Atendido parcial</option><option value="nao" ${stPed === 'nao' ? 'selected' : ''}>Não atendido</option><option value="" ${stPed === '' ? 'selected' : ''}>Todos</option></select></label></div>
+    <div class="card">${porMun(ps, rs => `<div style="display:flex;flex-direction:column;gap:12px;padding:6px 0">${rs.map(p => cardPed(p, acoes(p))).join('')}</div>`, 'Nenhum pedido nesta situação.')}</div>
+    <div class="card"><div class="row" style="padding-bottom:10px"><h2>Consolidado do pedido trimestral MH (sem pedidos extras)</h2>${refs.length ? `<select id="refCons">${refs.map(r => `<option ${r === refCons ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select>` : ''}</div>
+    ${refs.length ? `<div class="tw"><table><thead><tr><th>Município</th>${CATS.map(([, l]) => `<th class="n">${l.replace('Paucibacilar', 'PB').replace('Multibacilar', 'MB')}</th>`).join('')}<th class="n">Total pedido</th><th>Situação</th></tr></thead><tbody>
+      ${MUNS.map(m => { const p = ult(m); return `<tr><td>${m}</td>${CATS.map(([k]) => `<td class="n">${p ? (p.itens[k] || 0) * 3 : '—'}</td>`).join('')}<td class="n"><b>${p ? CATS.reduce((s, [k]) => s + (p.itens[k] || 0) * 3, 0) : '—'}</b></td><td>${p ? chipSt(p.status) : '<span class="chip c-mut">Não enviou</span>'}</td></tr>`; }).join('')}
+      <tr><td><b>8º CRS</b></td>${CATS.map(([k]) => `<td class="n"><b>${MUNS.reduce((s, m) => s + ((ult(m) || {itens:{}}).itens[k] || 0) * 3, 0)}</b></td>`).join('')}<td class="n"><b>${MUNS.reduce((s, m) => { const p = ult(m); return s + (p ? CATS.reduce((t, [k]) => t + (p.itens[k] || 0) * 3, 0) : 0); }, 0)}</b></td><td></td></tr></tbody></table></div>
+      <div class="sub" style="padding-top:8px">Valores já multiplicados por 3. Se o município enviou mais de um pedido no trimestre, vale o mais recente.</div>` : '<div class="empty">Nenhum pedido trimestral enviado ainda.</div>'}</div>
+    ${consolidadoTB()}`;
+}
+let refTB = '';
+function consolidadoTB() {
+  const refs = [...new Set(D.pedidos.filter(p => p.tipo === 'trimestral_tb' && p.modalidade !== 'extra').map(p => p.referencia))];
+  if (!refs.includes(refTB)) refTB = refs[0] || '';
+  const ps = D.pedidos.filter(p => p.tipo === 'trimestral_tb' && p.modalidade !== 'extra' && p.referencia === refTB && p.status !== 'nao');
+  const ult = {}; ps.forEach(p => { const k = p.municipio + '|' + p.itens.esquema; if (!ult[k] || p.criado_em > ult[k].criado_em) ult[k] = p; });
+  const sol = (m, med) => Object.values(ult).filter(p => p.municipio === m).reduce((s, p) => s + (p.itens.sol[med] || 0), 0);
+  const meds = Object.keys(MED).filter(med => MUNS.some(m => sol(m, med)));
+  return `<div class="card"><div class="row" style="padding-bottom:10px"><h2>Consolidado do pedido trimestral TB (sem pedidos extras)</h2>${refs.length ? `<select id="refTB">${refs.map(r => `<option ${r === refTB ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select>` : ''}</div>
+    ${meds.length ? `<div class="tw"><table><thead><tr><th>Medicamento</th>${MUNS.map(m => `<th class="n">${m}</th>`).join('')}<th class="n">8º CRS</th></tr></thead><tbody>
+      ${meds.map(med => `<tr><td>${MED[med]}</td>${MUNS.map(m => `<td class="n">${sol(m, med) || '—'}</td>`).join('')}<td class="n"><b>${MUNS.reduce((s, m) => s + sol(m, med), 0)}</b></td></tr>`).join('')}</tbody></table></div>
+      <div class="sub" style="padding-top:8px">Soma de todos os esquemas, já descontado o estoque informado. Pedidos "não atendidos" ficam de fora; se houver mais de um pedido do mesmo esquema, vale o mais recente.</div>`
+      : '<div class="empty">Nenhum pedido trimestral de TB enviado ainda.</div>'}</div>`;
+}
+
+/* ======================= SINAN ======================= */
+const COD = {
+  co: {1:'PB',2:'MB'}, ai: {0:'Grau zero',1:'Grau I',2:'Grau II',3:'Não avaliado'}, et: {1:'PQT/PB/6 doses',2:'PQT/MB/12 doses',3:'Outros esquemas'},
+  er: {1:'Reação tipo 1',2:'Reação tipo 2',3:'Reação tipo 1 e 2',4:'Sem reação'}, saida: {1:'Cura',2:'Transf. mesmo município',3:'Transf. outro município',4:'Transf. outro estado',5:'Transf. outro país',6:'Óbito',7:'Abandono',8:'Erro diagnóstico'},
+  forma: {1:'Pulmonar',2:'Extrapulmonar',3:'Pulmonar + extrapulmonar'}, bac: {1:'Positivo',2:'Negativo',3:'Não realizado',4:'Não se aplica'}, hiv: {1:'Positivo',2:'Negativo',3:'Em andamento',4:'Não realizado'},
+  tarv: {1:'Sim',2:'Não',9:'Ignorado'}, cultura: {1:'Positiva',2:'Negativa',3:'Em andamento',4:'Não realizada'}, trm: {1:'Detectável sensível à rifampicina',2:'Detectável resistente à rifampicina',3:'Não detectável',4:'Inconclusivo',5:'Não realizado'},
+  histo: {1:'BAAR positivo',2:'Sugestivo de TB',3:'Não sugestivo',4:'Em andamento',5:'Não realizado'}, ts: {1:'Resistente só H',2:'Resistente só R',3:'Resistente H e R',4:'Resistente outras 1ª linha',5:'Sensível',6:'Em andamento',7:'Não realizado'},
+  tdo: {1:'Sim',2:'Não',9:'Ignorado'}, situacao: {1:'Cura',2:'Abandono',3:'Óbito por TB',4:'Óbito outras causas',5:'Transferência',6:'Mudança de diagnóstico',7:'TB-DR',8:'Mudança de esquema',9:'Falência',10:'Abandono primário'}
+};
+const BACS = ['bac1','bac2','bac3','bac4','bac5','bac6','bac_apos'];
+const CAMPOS = {
+  MH: [['municipio','Município de notificação',['MUNICIPIO DE NOTIFICACAO ATUAL','MUNICIPIO']],['unidade','Unidade',['UNIDADE DE SAUDE']],['nnotif','Nº notificação',['N DA NOTIFICACAO ATUAL','N NOTIFICACAO','NUMERO DA NOTIFICACAO']],
+    ['dt_notif','Data notificação',['DATA DA NOTIFICACAO ATUAL','DATA DA NOTIFICACAO'],'d'],['nome','Nome'],['mun_res','Município residência',['MUNICIPIO RESIDENCIA']],
+    ['dt_ult','Data último comparecimento',['DATA ULTIMO COMPAREC','DATA DO ULTIMO COMPARECIMENTO'],'d'],['co','CO',['CLASSIFICACAO OPERACIONAL ATUAL']],['ai','AI'],['et','ET',['ESQUEMA TERAPEUTICO ATUAL']],
+    ['nd','ND',['DOSES SUPERVISIONADAS']],['er','ER'],['dt_mud','Data mudança esquema',['DATA MUDANCA ESQUEMA'],'d'],['cont_reg','Contatos registrados',['CONT REG']],['cont_exam','Contatos examinados',['CONT EXAM']],['saida','Tipo saída',['TIPO SAIDA','TIPO DE SAIDA']]],
+  TB: [['municipio','Município de notificação',['MUNICIPIO DE NOTIFICACAO ATUAL','MUNICIPIO']],['unidade','Unidade',['UNIDADE DE SAUDE']],['nnotif','Nº notificação',['N DA NOTIFICACAO ATUAL','N NOTIFICACAO','NUMERO DA NOTIFICACAO']],
+    ['dt_notif','Data notificação',['DATA DA NOTIFICACAO ATUAL','DATA DA NOTIFICACAO'],'d'],['nome','Nome'],['forma','Forma'],
+    ['bac1','Bac 1º mês',['BAC 1 MES']],['bac2','Bac 2º mês',['BAC 2 MES']],['bac3','Bac 3º mês',['BAC 3 MES']],['bac4','Bac 4º mês',['BAC 4 MES']],['bac5','Bac 5º mês',['BAC 5 MES']],['bac6','Bac 6º mês',['BAC 6 MES']],
+    ['bac_apos','Bac após 6º mês',['BAC APOS 6 MES']],['cont_id','Contatos identificados',['TOTAL CONTAT IDENTIF','TOTAL CONTATOS IDENTIFICADOS']],['cont_exam','Contatos examinados',['TOTAL CONTAT EXAM','TOTAL CONTATOS EXAMINADOS']],
+    ['hiv','HIV'],['tarv','TARV'],['cultura','Cultura'],['trm','TRM-TB',['TRM TB']],['histo','Histopatologia',['HISTOPAT']],['ts','TS',['TESTE DE SENSIBILIDADE']],['tdo','Realizado TDO',['REALIZADO TDO']],
+    ['situacao','Situação encerramento',['SITUACAO ENCERRA','SITUACAO DE ENCERRAMENTO']],['se_transf','Se transferência',['SE TRANSF']],['local_transf','Local de transferência',['LOCAL DE TRANSF MUN UF','LOCAL DE TRANSF']]]
+};
+const num = v => v === '' || v == null ? null : +v;
+function pendencias(c) {
+  const d = c.dados || {}, out = [], dn = dias(d.dt_notif);
+  if (c.agravo === 'MH') {
+    if (!d.saida) {
+      const cr = num(d.cont_reg), ce = num(d.cont_exam) || 0;
+      if (!cr) out.push('Nenhum contato registrado'); else if (ce < cr) out.push(`Contatos examinados: ${ce} de ${cr}`);
+      if (!d.dt_ult) out.push('Sem data do último comparecimento'); else if (dias(d.dt_ult) > 90) out.push(`Sem comparecimento há ${dias(d.dt_ult)} dias`);
+      if (!d.nd && d.nd !== 0) out.push('Doses supervisionadas não informadas');
+      if ((d.co == 1 && d.et == 2) || (d.co == 2 && d.et == 1)) out.push('Esquema não corresponde à classificação operacional');
+      if (dn != null && d.co == 1 && dn > 270) out.push('PB com mais de 9 meses sem encerramento');
+      if (dn != null && d.co == 2 && dn > 540) out.push('MB com mais de 18 meses sem encerramento');
+    } else if (d.saida == 1 && (!d.ai || d.ai == 3)) out.push('Cura sem avaliação do grau de incapacidade');
+  } else if (!d.situacao) {
+    if ((d.forma == 1 || d.forma == 3) && dn != null) {
+      const falta = [1, 2, 3, 4, 5, 6].filter(m => dn > m * 30 + 30 && (!d['bac' + m] || d['bac' + m] == 3));
+      if (falta.length) out.push(`Baciloscopia de controle pendente: ${falta.map(m => m + 'º').join(', ')} mês`);
+    }
+    const ci = num(d.cont_id), ce = num(d.cont_exam) || 0;
+    if (ci && ce < ci) out.push(`Contatos examinados: ${ce} de ${ci}`);
+    if (!d.hiv) out.push('HIV não informado'); else if (d.hiv == 3) out.push('HIV em andamento'); else if (d.hiv == 4) out.push('HIV não realizado');
+    if (d.hiv == 1 && d.tarv != 1) out.push('HIV positivo sem TARV informada');
+    if (!d.tdo || d.tdo == 9) out.push('TDO não informado');
+    if (dn != null && dn > 210) out.push(`${Math.floor(dn / 30)} meses sem encerramento`);
+  }
+  return out;
+}
+let filtroSit = 'abertas';
+const SIT = { pendente: ['Aguardando correção do município', 'c-bad'], corrigido: ['Município corrigiu · conferir no banco', 'c-info'], resolvido: ['Resolvida', 'c-ok'] };
+const chipSit = s => SIT[s] ? `<span class="chip ${SIT[s][1]}">${SIT[s][0]}</span>` : '';
+function vSinan(ag) {
+  const casos = D.sinan_casos.filter(c => c.agravo === ag).filter(doFiltro);
+  const n = st => casos.filter(c => c.situacao === st).length;
+  const ok = c => filtroSit === 'abertas' ? c.situacao !== 'resolvido' : c.situacao === filtroSit;
+  const ordem = { corrigido: 0, pendente: 1, resolvido: 2 };
+  const lista = casos.filter(ok).sort((a, b) => (ordem[a.situacao] ?? 1) - (ordem[b.situacao] ?? 1) || (b.atualizado_em || '').localeCompare(a.atualizado_em || ''));
+  const tab = rs => `<div class="tw"><table><thead><tr><th>Nº notif.</th><th>Paciente</th><th>Pendência apontada</th><th>Situação</th><th>Atualizado</th></tr></thead><tbody>${rs.map(c => `
+    <tr class="click" data-a="caso" data-id="${c.id}"><td>${esc(c.nnotif)}</td><td><b>${esc(c.dados.nome)}</b><div class="sub">${esc(c.dados.unidade || '')}</div></td>
+      <td>${esc((c.obs_regional || '').slice(0, 140))}${(c.obs_regional || '').length > 140 ? '…' : ''}${c.resposta ? `<div class="sub">Município: ${esc(c.resposta.slice(0, 100))}</div>` : ''}</td>
+      <td>${chipSit(c.situacao)}</td><td>${fmtD((c.atualizado_em || '').slice(0, 10))}</td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="row"><div class="gap">${isReg() ? `<button class="btn" data-a="novoCaso" data-ag="${ag}">Incluir pendência</button>` : ''}</div>
+    <label style="flex-direction:row;align-items:center;gap:8px">Mostrar<select id="filtroSit">
+      <option value="abertas">Em aberto (${n('pendente') + n('corrigido')})</option><option value="pendente" ${filtroSit === 'pendente' ? 'selected' : ''}>Aguardando o município (${n('pendente')})</option>
+      <option value="corrigido" ${filtroSit === 'corrigido' ? 'selected' : ''}>Corrigidas, para conferir (${n('corrigido')})</option><option value="resolvido" ${filtroSit === 'resolvido' ? 'selected' : ''}>Resolvidas (${n('resolvido')})</option></select></label></div>
+    <div class="sub">${isReg() ? 'A regional inclui a pendência → o município corrige no SINAN e sinaliza → a regional confere no banco e elimina a pendência.' : 'Abra a pendência, corrija no SINAN e clique em "Sinalizar que corrigi". A regional confere no banco e encerra.'}</div>
+    <div class="card">${porMun(lista, tab, filtroSit === 'resolvido' ? 'Nenhuma pendência resolvida ainda.' : 'Nenhuma pendência em aberto.')}</div>`;
+}
+function abrirCaso(c) {
+  const ag = c.agravo, d = c.dados, p = pendencias(c);
+  const val = (k, t) => { const v = d[k]; if (v == null || v === '') return null; if (t === 'd') return fmtD(v); const map = COD[k] || (k.startsWith('bac') ? COD.bac : null); return map && map[v] ? `${v} · ${map[v]}` : esc(v); };
+  const det = CAMPOS[ag].filter(([k]) => !['nome', 'municipio', 'nnotif'].includes(k)).map(([k, l, , t]) => [l, val(k, t)]).filter(([, v]) => v);
+  dlg(`<div class="dlg"><div class="row"><div><h2>${esc(d.nome)}</h2><div class="sub">${ag === 'MH' ? 'Hanseníase' : 'Tuberculose'} · notificação ${esc(c.nnotif)} · ${esc(c.municipio)}</div></div><button class="btn sm sec" data-a="fechar">Fechar</button></div>
+    <div>${chipSit(c.situacao)}${c.resolvido_em ? `<span class="sub"> em ${fmtD(c.resolvido_em.slice(0, 10))}</span>` : ''}</div>
+    <div class="card" style="background:#F7FAFA;display:flex;flex-direction:column;gap:10px"><h3>Pendência apontada pela regional</h3>
+      ${isReg() && c.situacao === 'pendente' ? `<textarea id="cObs">${esc(c.obs_regional || '')}</textarea><div><button class="btn sm sec" data-a="obsSalvar" data-id="${c.id}">Salvar alteração do texto</button></div>` : `<div>${esc(c.obs_regional || '')}</div>`}
+      ${c.resposta ? `<div><span class="sub">Resposta do município${c.corrigido_em ? ' (' + fmtD(c.corrigido_em.slice(0, 10)) + ')' : ''}:</span> ${esc(c.resposta)}</div>` : ''}
+      ${!isReg() && c.situacao === 'pendente' ? `<textarea id="cResp" placeholder="O que foi corrigido (opcional)"></textarea><div><button class="btn sm" data-a="corrigido" data-id="${c.id}">Sinalizar que corrigi</button></div>` : ''}
+      ${isReg() && c.situacao === 'corrigido' ? `<div class="gap"><button class="btn sm" data-a="resolver" data-id="${c.id}">Conferido no banco · eliminar pendência</button>
+        <button class="btn sm red" data-a="devolver" data-id="${c.id}">Não foi corrigido · devolver ao município</button></div>
+        <textarea id="cObs2" placeholder="Se for devolver, escreva o que ainda falta (opcional)"></textarea>` : ''}
+      ${isReg() && c.situacao === 'resolvido' ? `<div><button class="btn sm sec" data-a="devolver" data-id="${c.id}">Reabrir pendência</button></div>` : ''}</div>
+    ${det.length ? `<div class="det">${det.map(([l, v]) => `<div><span>${l}</span>${v}</div>`).join('')}</div>` : ''}
+    ${p.length && c.situacao !== 'resolvido' ? `<div><span class="sub">Pelos dados informados, o site também encontrou:</span><br>${p.map(x => `<span class="chip c-warn">${esc(x)}</span>`).join('')}</div>` : ''}
+    ${isReg() ? `<div class="gap"><button class="btn sm sec" data-a="editCaso" data-id="${c.id}">Editar dados do caso</button><button class="btn sm red" data-a="delCaso" data-id="${c.id}">Excluir</button></div>` : ''}</div>`);
+}
+function formCaso(ag, c) {
+  const d = c ? c.dados : {}, basicos = ['nnotif', 'nome', 'unidade', 'dt_notif'];
+  const campo = ([k, l, , t]) => { const map = COD[k] || (k.startsWith('bac') ? COD.bac : null), v = d[k] ?? '';
+    if (map) return `<label>${l}<select id="cs_${k}"><option value=""></option>${Object.entries(map).map(([c2, s]) => `<option value="${c2}" ${String(v) === c2 ? 'selected' : ''}>${c2} · ${s}</option>`).join('')}</select></label>`;
+    return `<label>${l}<input id="cs_${k}" ${t === 'd' ? 'type="date"' : ''} ${['nnotif', 'nome'].includes(k) ? 'required' : ''} value="${esc(v)}"></label>`; };
+  const resto = CAMPOS[ag].filter(([k]) => k !== 'municipio' && !basicos.includes(k));
+  dlg(`<form id="fCaso"><h2>${c ? 'Editar caso' : 'Incluir pendência'} · ${ag === 'MH' ? 'Hanseníase' : 'Tuberculose'}</h2>
+    <div class="grid">${munSelect('csMun', c && c.municipio)}${basicos.map(k => campo(CAMPOS[ag].find(f => f[0] === k))).join('')}</div>
+    ${c ? '' : `<label>Apontamento para o município<textarea id="csObs" required placeholder="Ex.: atualizar data do último comparecimento; examinar os 4 contatos registrados"></textarea></label>`}
+    <details ${c ? 'open' : ''}><summary style="cursor:pointer;color:var(--brand)">Outros campos do boletim (opcional)</summary>
+      <div class="sub" style="padding:6px 0">Não é obrigatório. Se preencher, o site também sugere outras pendências pelos dados.</div><div class="grid">${resto.map(campo).join('')}</div></details>
+    <div class="row"><span class="err" id="csErr"></span><div class="gap"><button type="button" class="btn sec" data-a="fechar">Cancelar</button><button class="btn">Salvar</button></div></div></form>`);
+  $('fCaso').onsubmit = async e => { e.preventDefault();
+    const dd = { ...d }; CAMPOS[ag].forEach(([k]) => { const el = $('cs_' + k); if (el) dd[k] = el.value.trim() || null; });
+    dd.nnotif = dd.nnotif.replace(/\D/g, '').padStart(7, '0'); if (!c) dd.manual = true;
+    const mun = $('csMun').value;
+    const dup = D.sinan_casos.find(x => x.agravo === ag && x.municipio === mun && x.nnotif === dd.nnotif && (!c || x.id !== c.id));
+    if (dup && (c || dup.situacao !== 'resolvido')) { $('csErr').textContent = 'Esse nº de notificação já tem pendência em aberto neste município.'; return; }
+    if (dup) { if (await salvar(() => db.update('sinan_casos', dup.id, { dados: { ...dup.dados, ...dd }, obs_regional: $('csObs').value.trim(), situacao: 'pendente', resposta: null, resolvido_em: null, corrigido_em: null, atualizado_em: new Date().toISOString() }), 'Pendência reaberta para o município.')) $('dlg').close(); return; }
+    const ok = await salvar(() => c ? db.update('sinan_casos', c.id, { municipio: mun, nnotif: dd.nnotif, dados: dd, atualizado_em: new Date().toISOString() })
+      : db.insert('sinan_casos', { agravo: ag, municipio: mun, nnotif: dd.nnotif, dados: dd, obs_regional: $('csObs').value.trim(), situacao: 'pendente' }), c ? 'Caso atualizado.' : 'Caso incluído e apontamento enviado ao município.');
+    if (ok) { $('dlg').close(); if (c) abrirCaso(D.sinan_casos.find(x => x.id === c.id)); } };
+}
+/* ======================= CLIQUES ======================= */
+function dlg(html) { const d = $('dlg'); d.innerHTML = html; if (!d.open) d.showModal(); }
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-a]'); if (!b) return;
+  const a = b.dataset.a, id = +b.dataset.id;
+  if (a === 'fechar') { e.preventDefault(); $('dlg').close(); }
+  if (a === 'pac') formPaciente(D.tali_pacientes.find(p => p.id === id));
+  if (a === 'retirar') formRetirar(D.tali_pacientes.find(p => p.id === id));
+  if (a === 'reativar') salvar(() => db.update('tali_pacientes', id, { ativo: true, saida_data: null, saida_motivo: null }), 'Paciente voltou para a lista em tratamento.');
+  if (a === 'disp') formDisp(id || null);
+  if (a === 'editDisp') formDisp(null, D.tali_dispensacoes.find(d => d.id === id));
+  if (a === 'delDisp') dlg(`<div class="dlg"><h2>Excluir esta dispensação?</h2><div class="row"><span></span><div class="gap"><button class="btn sec" data-a="fechar">Cancelar</button><button class="btn" data-a="delDispOk" data-id="${id}">Excluir</button></div></div></div>`);
+  if (a === 'delDispOk') { await salvar(() => db.del('tali_dispensacoes', id), 'Dispensação excluída.'); $('dlg').close(); }
+  if (a === 'exportar') formExportar();
+  if (a === 'delPed') dlg(`<div class="dlg"><h2>Cancelar este pedido?</h2><div class="sub">Ele ainda não foi analisado pela regional.</div><div class="row"><span></span><div class="gap"><button class="btn sec" data-a="fechar">Voltar</button><button class="btn" data-a="delPedOk" data-id="${id}">Cancelar pedido</button></div></div></div>`);
+  if (a === 'delPedOk') { await salvar(() => db.del('pedidos', id), 'Pedido cancelado.'); $('dlg').close(); }
+  if (a === 'st') { const st = b.dataset.st;
+    salvar(() => db.update('pedidos', id, { status: st, obs: ($('obs_' + id)?.value || '').trim() || null, analisado_em: st === 'aberto' ? null : new Date().toISOString() }), st === 'aberto' ? 'Pedido reaberto.' : 'Pedido analisado.'); }
+  if (a === 'caso') abrirCaso(D.sinan_casos.find(c => c.id === id));
+  const agora = () => new Date().toISOString(), caso = () => D.sinan_casos.find(c => c.id === id);
+  if (a === 'obsSalvar') { const t = $('cObs').value.trim(); if (!t) return;
+    if (await salvar(() => db.update('sinan_casos', id, { obs_regional: t, atualizado_em: agora() }), 'Texto da pendência atualizado.')) abrirCaso(caso()); }
+  if (a === 'corrigido') { if (await salvar(() => db.update('sinan_casos', id, { situacao: 'corrigido', resposta: $('cResp').value.trim() || 'Corrigido no SINAN.', corrigido_em: agora(), atualizado_em: agora() }), 'Regional avisada da correção.')) $('dlg').close(); }
+  if (a === 'resolver') { if (await salvar(() => db.update('sinan_casos', id, { situacao: 'resolvido', resolvido_em: agora(), atualizado_em: agora() }), 'Pendência eliminada.')) $('dlg').close(); }
+  if (a === 'devolver') { const extra = ($('cObs2')?.value || '').trim(), c = caso();
+    const obs = extra ? `${c.obs_regional || ''}\n[${fmtD(hojeISO())}] Devolvido: ${extra}`.trim() : c.obs_regional;
+    if (await salvar(() => db.update('sinan_casos', id, { situacao: 'pendente', obs_regional: obs, resolvido_em: null, atualizado_em: agora() }), 'Pendência devolvida ao município.')) $('dlg').close(); }
+  if (a === 'novoCaso') formCaso(b.dataset.ag);
+  if (a === 'editCaso') { const c = D.sinan_casos.find(x => x.id === id); formCaso(c.agravo, c); }
+  if (a === 'delCaso') dlg(`<div class="dlg"><h2>Excluir este caso da lista?</h2><div class="sub">O apontamento e a resposta do município também são apagados.</div><div class="row"><span></span><div class="gap"><button class="btn sec" data-a="fechar">Cancelar</button><button class="btn" data-a="delCasoOk" data-id="${id}">Excluir</button></div></div></div>`);
+  if (a === 'delCasoOk') { await salvar(() => db.del('sinan_casos', id), 'Caso excluído.'); $('dlg').close(); }
+});
+
+/* ======================= DEMONSTRAÇÃO ======================= */
+function demoData() {
+  const h = new Date(), iso = (dd) => { const d = new Date(h); d.setDate(d.getDate() - dd); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+  const P = [['Maria das Graças Teixeira','PORTEL','F','1991-03-12'],['José Ribamar Fonseca','PORTEL','M','1968-07-01'],['Antônia Lobato Cardoso','BAGRE','F','1985-11-20'],
+    ['Raimundo Nonato Pinheiro','BREVES','M','1972-02-14'],['Francisco Leal Sarmento','CURRALINHO','M','1959-09-09'],['Luzia Pantoja Ramos','BREVES','F','1960-05-30'],['Edivaldo Gomes Barra','GURUPÁ','M','1980-01-18']];
+  let id = 1;
+  const tali_pacientes = P.map(([nome, municipio, sexo, nascimento], i) => ({ id: id++, municipio, nome, sexo, nascimento, cns: `700 0000 0000 ${pad(i + 10)}${pad(i)}`, rg: String(500000 + i * 731), mae: 'Mãe fictícia ' + (i + 1),
+    endereco: 'Endereço fictício, ' + (i + 10), telefone: '', updt: 'UPDT ' + municipio, cnes: String(2700000 + i), cid: 'A30.9', inicio: iso(400 - i * 40), medico: 'Dra. Médica Fictícia', crm: 'CRM/PA 0000' + i, ativo: i !== 4,
+    saida_data: i === 4 ? iso(20) : null, saida_motivo: i === 4 ? 'Fim do tratamento com talidomida' : null }));
+  const tali_dispensacoes = [];
+  tali_pacientes.forEach((p, i) => { for (let k = 0; k < 4; k++) if ((i + k) % 3 !== 0) tali_dispensacoes.push({ id: id++, paciente_id: p.id, municipio: p.municipio, data: iso(k * 30 + i * 2 + 3), quantidade: 30 + (i % 2) * 30,
+    lote: '2305001' + i, validade: iso(-300), receita: String(150 + i * 4 + k), medico: p.medico, crm: p.crm, farmaceutico: 'Farmacêutico Fictício', crf: 'CRF/PA 0000' }); });
+  const tri = trimestres()[1];
+  const pedidos = [
+    { id: id++, municipio: 'BREVES', tipo: 'trimestral', referencia: tri, agravo: 'MH', itens: { pb_m15: 1, pb_15: 6, mb_m15: 0, mb_15: 14 }, status: 'aberto', criado_em: iso(2) + 'T10:00:00Z' },
+    { id: id++, municipio: 'PORTEL', tipo: 'trimestral', referencia: tri, agravo: 'MH', itens: { pb_m15: 0, pb_15: 3, mb_m15: 1, mb_15: 9 }, status: 'integral', obs: 'Retirar na regional.', criado_em: iso(6) + 'T10:00:00Z', analisado_em: iso(4) + 'T10:00:00Z' },
+    { id: id++, municipio: 'BAGRE', tipo: 'trimestral', modalidade: 'extra', referencia: tri, agravo: 'MH', itens: { pb_m15: 0, pb_15: 0, mb_m15: 0, mb_15: 2 }, status: 'aberto', criado_em: iso(1) + 'T10:00:00Z' },
+    { id: id++, municipio: 'MELGAÇO', tipo: 'trimestral', modalidade: 'trimestral', referencia: tri, agravo: 'MH', itens: { pb_m15: 0, pb_15: 2, mb_m15: 0, mb_15: 5 }, status: 'parcial', obs: 'Enviado parte, restante no próximo envio.', criado_em: iso(12) + 'T10:00:00Z', analisado_em: iso(10) + 'T10:00:00Z' }];
+  const nB = { b1a: 0, b1b: 2, b1c: 1, b1d: 0, b2a: 0, b2b: 3, b2c: 1, b2d: 0 }, tB = totaisTB('basico', nB), eB = { RHZE: 120, RH300: 90, RH150: 0 };
+  const sB = {}; Object.keys(tB).forEach(m => sB[m] = Math.max(0, tB[m] - eB[m]));
+  pedidos.push({ id: id++, municipio: 'BREVES', tipo: 'trimestral_tb', referencia: tri, agravo: 'TB', itens: { esquema: 'basico', n: nB, tot: tB, est: eB, val: { RHZE: iso(-200), RH300: iso(-150), RH150: null }, sol: sB }, status: 'aberto', criado_em: iso(1) + 'T12:00:00Z' });
+  const mh = [['0105335','Ana Paula Fictícia',380,'1','1','',3,1,8,4],['0105336','Pedro Fictício Lima',200,'2','2',90,10,3,3,3],['0105342','Rosa Fictícia Melo',110,'2','2',null,'',4,7,0],
+    ['0105400','Joaquim Fictício Reis',600,'2','2',40,14,4,5,5],['0105411','Clara Fictícia Souza',60,'1','2',20,2,4,2,2]];
+  const tb = [['0007703','Manoel Fictício Nascimento',480,'1','','',6,0,'2','','1'],['0007868','Denise Fictícia Amaral',210,'1','2,2,3,2,3',1,5,1,'2','1',''],['0007889','Carlos Fictício Ferreira',112,'1','2,2',1,4,4,'4','',''],
+    ['0012917','Domingos Fictício Saraiva',100,'2','',1,14,14,'2','1',''],['0012925','Meriane Fictícia Costa',76,'1','',3,2,2,'1','2','']];
+  const sinan_casos = [];
+  mh.forEach(([n, nome, dn, co, et, ult, nd, er, cr, ce], i) => sinan_casos.push({ id: id++, agravo: 'MH', municipio: ['BREVES','BREVES','PORTEL','BAGRE','ANAJÁS'][i], nnotif: n,
+    dados: { nnotif: n, nome, unidade: 'UBS Fictícia', dt_notif: iso(dn), mun_res: '150180', dt_ult: ult == null ? null : ult === '' ? null : iso(ult), co, ai: '', et, nd: nd === '' ? null : String(nd), er: String(er), cont_reg: String(cr), cont_exam: String(ce), saida: '' },
+    situacao: ['pendente','corrigido','pendente','resolvido','pendente'][i], obs_regional: ['Contatos registrados sem exame: examinar e atualizar no SINAN.','Atualizar data do último comparecimento e examinar os contatos registrados.','Doses supervisionadas e data do último comparecimento em branco.','Caso MB com mais de 18 meses: encerrar.','Esquema terapêutico não corresponde à classificação operacional.'][i], resposta: i === 1 ? 'Atualizado no SINAN em 12/11.' : null, atualizado_em: iso(5 - i) + 'T12:00:00Z', resolvido_em: i === 3 ? iso(2) + 'T12:00:00Z' : null }));
+  tb.forEach(([n, nome, dn, forma, bacs, x, ci, ce, hiv, tdo, situ], i) => { const b = bacs ? bacs.split(',') : [], dd = { nnotif: n, nome, unidade: 'UBS Fictícia', dt_notif: iso(dn), forma, cont_id: String(ci), cont_exam: String(ce), hiv, tarv: hiv === '1' ? '' : '', tdo, situacao: situ, cultura: '4', trm: '5', histo: '5' };
+    b.forEach((v, k) => dd['bac' + (k + 1)] = v); sinan_casos.push({ id: id++, agravo: 'TB', municipio: ['BREVES','BREVES','GURUPÁ','PORTEL','MELGAÇO'][i], nnotif: n, dados: dd, situacao: i === 0 ? 'corrigido' : 'pendente', obs_regional: ['Caso com mais de 6 meses: encerrar no SINAN.','Baciloscopias de controle do 3º e 5º mês não realizadas; contatos sem exame.','HIV não realizado e TDO em branco.','Total de contatos examinados em branco.','HIV positivo sem TARV informada.'][i], resposta: i === 0 ? 'Encerrado como cura em 10/11.' : null, atualizado_em: iso(4 - i) + 'T12:00:00Z' }); });
+  seq = id + 10;
+  return { tali_pacientes, tali_dispensacoes, pedidos, sinan_casos };
+}
+
+iniciar();
+}
+</script>
+</body>
+</html>
