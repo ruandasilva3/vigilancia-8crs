@@ -177,9 +177,13 @@ const db = {
     const { error } = await sb.from(t).delete().in('id', ids); if (error) throw error;
   }
 };
+let ocupado = false;   // evita salvar duas vezes com clique duplo
 async function salvar(fn, msg) {
+  if (ocupado) return false;
+  ocupado = true; document.body.style.cursor = 'progress';
   try { await fn(); await db.load(); render(); if (msg) toast(msg); return true; }
   catch (e) { console.error(e); toast('Não foi possível salvar: ' + (e.message || e)); return false; }
+  finally { ocupado = false; document.body.style.cursor = ''; }
 }
 
 /* ======================= LOGIN ======================= */
@@ -684,9 +688,6 @@ function formCaso(ag, c) {
     const dd = { ...d }; CAMPOS[ag].forEach(([k]) => { const el = $('cs_' + k); if (el) dd[k] = el.value.trim() || null; });
     dd.nnotif = dd.nnotif.replace(/\D/g, '').padStart(7, '0'); if (!c) dd.manual = true;
     const mun = $('csMun').value;
-    const dup = D.sinan_casos.find(x => x.agravo === ag && x.municipio === mun && x.nnotif === dd.nnotif && (!c || x.id !== c.id));
-    if (dup && (c || dup.situacao !== 'resolvido')) { $('csErr').textContent = 'Esse nº de notificação já tem pendência em aberto neste município.'; return; }
-    if (dup) { if (await salvar(() => db.update('sinan_casos', dup.id, { dados: { ...dup.dados, ...dd }, obs_regional: $('csObs').value.trim(), situacao: 'pendente', resposta: null, resolvido_em: null, corrigido_em: null, atualizado_em: new Date().toISOString() }), 'Pendência reaberta para o município.')) $('dlg').close(); return; }
     const ok = await salvar(() => c ? db.update('sinan_casos', c.id, { municipio: mun, nnotif: dd.nnotif, dados: dd, atualizado_em: new Date().toISOString() })
       : db.insert('sinan_casos', { agravo: ag, municipio: mun, nnotif: dd.nnotif, dados: dd, obs_regional: $('csObs').value.trim(), situacao: 'pendente' }), c ? 'Caso atualizado.' : 'Caso incluído e apontamento enviado ao município.');
     if (ok) { $('dlg').close(); if (c) abrirCaso(D.sinan_casos.find(x => x.id === c.id)); } };
