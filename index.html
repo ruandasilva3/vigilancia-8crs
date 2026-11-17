@@ -56,6 +56,12 @@ tr.click{cursor:pointer}tr.click:hover td{background:#F7FAFA}
 .c-warn{background:var(--warn);color:var(--warnk)}.c-bad{background:var(--bad);color:var(--badk)}
 .c-ok{background:var(--ok);color:var(--brand)}.c-mut{background:#E9ECEE;color:var(--mut)}.c-info{background:#E3EEFB;color:#1B4F8A}
 .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.inicio{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
+.avisos{background:#fff;border:1px solid var(--line);border-top:4px solid var(--brand);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.aviso{background:#F3F8F9;border-radius:10px;padding:10px 12px;font-size:14px;display:flex;flex-direction:column;gap:4px}
+.aviso.imp{background:var(--warn);border-left:4px solid #D99A00}
+.aviso .meta{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;color:var(--mut)}
+@media(max-width:1000px){.inicio{grid-template-columns:1fr}.avisos{order:-1}}
 .kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:8px}
 .kpi .l{display:flex;justify-content:space-between;font-size:14px}.kpi b{font-variant-numeric:tabular-nums}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
@@ -157,10 +163,10 @@ function parseD(v) {
 function toast(msg) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.append(t); setTimeout(() => t.remove(), 4200); }
 
 /* ======================= DADOS ======================= */
-const TABELAS = ['tali_pacientes', 'tali_dispensacoes', 'pedidos', 'sinan_casos'];
-let perfil = null, D = {tali_pacientes:[], tali_dispensacoes:[], pedidos:[], sinan_casos:[]}, MEM = null, seq = 1000;
+const TABELAS = ['tali_pacientes', 'tali_dispensacoes', 'pedidos', 'sinan_casos', 'avisos'];
+let perfil = null, D = {tali_pacientes:[], tali_dispensacoes:[], pedidos:[], sinan_casos:[], avisos:[]}, MEM = null, seq = 1000;
 const isReg = () => perfil === 'REGIONAL';
-const visivel = r => isReg() || r.municipio === perfil;
+const visivel = r => isReg() || !r.municipio || r.municipio === perfil;   // aviso sem município = para todos
 
 const db = {
   async load() {
@@ -279,7 +285,24 @@ function vInicio() {
       <div class="l"><a href="#sinan-tb">TB: pendências em aberto</a><b>${pt}</b></div>
       ${obs ? `<span class="chip ${isReg() ? 'c-info' : 'c-bad'}">${obs} ${isReg() ? 'corrigida(s) pelo município, para conferir' : 'pendência(s) para corrigir'}</span>` : ''}</div>`;
   };
-  return `<div class="sub">${isReg() ? 'Resumo por município. Use o filtro no topo para ver um município só.' : 'Resumo do seu município.'}</div><div class="kpis">${muns.map(k).join('')}</div>`;
+  return `<div class="inicio"><div style="display:flex;flex-direction:column;gap:14px"><div class="sub">${isReg() ? 'Resumo por município. Use o filtro no topo para ver um município só.' : 'Resumo do seu município.'}</div>
+    <div class="kpis">${muns.map(k).join('')}</div></div>${painelAvisos()}</div>`;
+}
+
+function painelAvisos() {
+  const avs = D.avisos.slice().sort((a, b) => (b.importante === true) - (a.importante === true) || (b.criado_em || '').localeCompare(a.criado_em || ''));
+  const item = a => `<div class="aviso ${a.importante ? 'imp' : ''}">${a.importante ? '<b style="font-size:12px;color:var(--warnk)">IMPORTANTE</b>' : ''}
+    <div>${esc(a.texto).replace(/\n/g, '<br>')}</div>
+    <div class="meta"><span>${fmtD((a.criado_em || '').slice(0, 10))}${isReg() ? ' · para ' + (a.municipio || 'todos os municípios') : ''}</span>
+      ${isReg() ? `<button class="btn sm red" data-a="avDel" data-id="${a.id}" style="min-height:28px;padding:0 8px;font-size:12px">Remover</button>` : ''}</div></div>`;
+  return `<div class="avisos"><h2>Avisos da Regional</h2>
+    ${avs.length ? avs.map(item).join('') : '<div class="sub">Nenhum aviso no momento.</div>'}
+    ${isReg() ? `<details ${avs.length ? '' : 'open'} style="border-top:1px solid var(--line);padding-top:10px"><summary style="cursor:pointer;color:var(--brand);font-weight:700">Escrever novo aviso</summary>
+      <div style="display:flex;flex-direction:column;gap:10px;padding-top:10px">
+        <textarea id="avTxt" placeholder="Ex.: Bem-vindos! O pedido trimestral de hanseníase vai até dia 10."></textarea>
+        <label>Para<select id="avMun"><option value="">Todos os municípios</option>${MUNS.map(m => `<option>${m}</option>`).join('')}</select></label>
+        <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="avImp" style="min-height:auto;width:18px;height:18px">Destacar como importante</label>
+        <button class="btn" data-a="avPub">Publicar aviso</button></div></details>` : ''}</div>`;
 }
 
 /* ======================= TALIDOMIDA · PACIENTES ======================= */
@@ -732,6 +755,10 @@ document.addEventListener('click', async e => {
   if (a === 'editCaso') { const c = D.sinan_casos.find(x => x.id === id); formCaso(c.agravo, c); }
   if (a === 'delCaso') dlg(`<div class="dlg"><h2>Excluir este caso da lista?</h2><div class="sub">O apontamento e a resposta do município também são apagados.</div><div class="row"><span></span><div class="gap"><button class="btn sec" data-a="fechar">Cancelar</button><button class="btn" data-a="delCasoOk" data-id="${id}">Excluir</button></div></div></div>`);
   if (a === 'delCasoOk') { await salvar(() => db.del('sinan_casos', id), 'Caso excluído.'); $('dlg').close(); }
+  if (a === 'avPub') { const t = $('avTxt').value.trim(); if (!t) { toast('Escreva o texto do aviso.'); return; }
+    await salvar(() => db.insert('avisos', { texto: t, municipio: $('avMun').value || null, importante: $('avImp').checked }), 'Aviso publicado.'); }
+  if (a === 'avDel') dlg(`<div class="dlg"><h2>Remover este aviso?</h2><div class="sub">Ele deixa de aparecer para os municípios.</div><div class="row"><span></span><div class="gap"><button class="btn sec" data-a="fechar">Cancelar</button><button class="btn" data-a="avDelOk" data-id="${id}">Remover</button></div></div></div>`);
+  if (a === 'avDelOk') { await salvar(() => db.del('avisos', id), 'Aviso removido.'); $('dlg').close(); }
 });
 
 /* ======================= DEMONSTRAÇÃO ======================= */
@@ -766,7 +793,9 @@ function demoData() {
   tb.forEach(([n, nome, dn, forma, bacs, x, ci, ce, hiv, tdo, situ], i) => { const b = bacs ? bacs.split(',') : [], dd = { nnotif: n, nome, unidade: 'UBS Fictícia', dt_notif: iso(dn), forma, cont_id: String(ci), cont_exam: String(ce), hiv, tarv: hiv === '1' ? '' : '', tdo, situacao: situ, cultura: '4', trm: '5', histo: '5' };
     b.forEach((v, k) => dd['bac' + (k + 1)] = v); sinan_casos.push({ id: id++, agravo: 'TB', municipio: ['BREVES','BREVES','GURUPÁ','PORTEL','MELGAÇO'][i], nnotif: n, dados: dd, situacao: i === 0 ? 'corrigido' : 'pendente', obs_regional: ['Caso com mais de 6 meses: encerrar no SINAN.','Baciloscopias de controle do 3º e 5º mês não realizadas; contatos sem exame.','HIV não realizado e TDO em branco.','Total de contatos examinados em branco.','HIV positivo sem TARV informada.'][i], resposta: i === 0 ? 'Encerrado como cura em 10/11.' : null, atualizado_em: iso(4 - i) + 'T12:00:00Z' }); });
   seq = id + 10;
-  return { tali_pacientes, tali_dispensacoes, pedidos, sinan_casos };
+  const avisos = [{ id: id++, texto: 'Bem-vindos ao sistema de Vigilância em Saúde do 8º CRS. Dúvidas, falar com a coordenação regional.', municipio: null, importante: false, criado_em: iso(3) + 'T12:00:00Z' },
+    { id: id++, texto: 'Pedido trimestral de hanseníase e tuberculose: enviar até o dia 10.', municipio: null, importante: true, criado_em: iso(1) + 'T12:00:00Z' }];
+  return { tali_pacientes, tali_dispensacoes, pedidos, sinan_casos, avisos };
 }
 
 iniciar();
