@@ -855,79 +855,91 @@ async function salvarEstoque() {
   await salvar(() => ex ? db.update('toxo_estoque', ex.id, r) : db.insert('toxo_estoque', { ...r, municipio: mun, periodo: triToxo }), 'Prestação de contas salva.');
 }
 function formToxoExp() {
-  dlg(`<form id="fTX"><h2>Baixar prestação de contas · toxoplasmose</h2><div class="sub">Sai no modelo do relatório de distribuição, com as dispensações do trimestre, a legenda e o estoque informado no trimestre. ${isReg() ? 'Com "Todos", cada município sai numa aba.' : ''}</div>
+  dlg(`<form id="fTX"><h2>Baixar prestação de contas · toxoplasmose</h2><div class="sub">Sai no modelo do relatório de distribuição, com as dispensações do trimestre, a legenda e o estoque informado no trimestre. ${isReg() ? 'Com "Todos os municípios", sai um arquivo único com todos, separados por município e com o total do 8º CRS.' : ''}</div>
     <div class="grid">${triSelect('txTri', triToxo).replace('flex-direction:row;align-items:center;gap:8px', '')}
-    ${isReg() ? `<label>Município<select id="txMun"><option value="">Todos (uma aba por município)</option>${MUNS.map(m => `<option ${m === filtroMun() ? 'selected' : ''}>${m}</option>`).join('')}</select></label>` : ''}</div>
+    ${isReg() ? `<label>Município<select id="txMun"><option value="">Todos os municípios (arquivo único)</option>${MUNS.map(m => `<option>${m}</option>`).join('')}</select></label>` : ''}</div>
     <div class="row"><span class="err" id="txErr"></span><div class="gap"><button type="button" class="btn sec" data-a="fechar">Cancelar</button><button class="btn">Baixar</button></div></div></form>`);
   $('fTX').onsubmit = async e => { e.preventDefault();
     try { await exportarToxo($('txTri').value, isReg() ? $('txMun').value : perfil); $('dlg').close(); } catch (er) { console.error(er); $('txErr').textContent = 'Não foi possível gerar a planilha.'; } };
 }
 async function exportarToxo(tri, mun) {
-  const wb = new ExcelJS.Workbook(), meses = triMeses(tri), nM = 3;
+  const wb = new ExcelJS.Workbook(), meses = triMeses(tri), nM = 3, muns = mun ? [mun] : MUNS;
   const imgPA = wb.addImage({ base64: IMG_PA, extension: 'jpeg' }), imgSE = wb.addImage({ base64: IMG_SESPA, extension: 'jpeg' });
   const fino = { style: 'thin' }, grosso = { style: 'medium' }, borda = { top: fino, left: fino, bottom: fino, right: fino };
+  const cinza = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBFBFBF' } }, claro = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7EEF0' } };
   const dt = iso => iso ? new Date(iso + 'T12:00:00') : null, periodo = `${tri.slice(6)}º TRIMESTRE/${tri.slice(0, 4)} (${mesBR(meses[0])} a ${mesBR(meses[2])})`;
-  for (const mu of (mun ? [mun] : MUNS)) {
-    const ws = wb.addWorksheet(norm(mu).slice(0, 31), { pageSetup: { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: .3, right: .3, top: .4, bottom: .4, header: .2, footer: .2 } } });
-    ws.columns = [30, 14, 11, 6, 11, 11, 12, 12, 8, 8, 8, 8, 8, 8, 8].map(w => ({ width: w }));
-    // cabeçalho com os brasões
-    ws.mergeCells('A1:B5'); ws.mergeCells('C1:L5'); ws.mergeCells('M1:O5');
-    const cab = ws.getCell('C1'); cab.value = 'SECRETARIA DE ESTADO DE SAÚDE PÚBLICA\nDIVISÃO DE VIGILÂNCIA EM SAÚDE\n8º CENTRO REGIONAL DE SAÚDE\nRELATÓRIO DE DISTRIBUIÇÃO DE MEDICAMENTO PARA TOXOPLASMOSE';
-    cab.font = { bold: true, size: 11 }; cab.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-    for (let r = 1; r <= 5; r++) { ws.getRow(r).height = 17; for (let c = 1; c <= 15; c++) { const cl = ws.getCell(r, c), b = {};
-      if (r === 1) b.top = grosso; if (r === 5) b.bottom = grosso; if (c === 1 || c === 3 || c === 13) b.left = grosso; if (c === 2 || c === 12 || c === 15) b.right = grosso; cl.border = b; } }
-    ws.addImage(imgPA, { tl: { col: 0.75, row: 0.15 }, ext: { width: 78, height: 78 } });
-    ws.addImage(imgSE, { tl: { col: 12.9, row: 0.15 }, ext: { width: 66, height: 79 } });
-    ws.getCell('A7').value = 'UF: PARÁ'; ws.getCell('C7').value = 'PERÍODO: ' + periodo; ws.getCell('G7').value = 'REGIONAL: 8º CRS – MARAJÓ II'; ws.getCell('L7').value = 'MUNICÍPIO: ' + mu;
-    ['A7', 'C7', 'G7', 'L7'].forEach(c => ws.getCell(c).font = { bold: true, size: 10 });
-    // cabeçalho da tabela
-    ws.mergeCells('I9:L9'); ws.mergeCells('M9:O9');
-    ws.getCell('I9').value = 'Unidades dispensadas'; ws.getCell('M9').value = 'Consumo médio mensal no período';
-    ['I9', 'M9'].forEach(c => { const cl = ws.getCell(c); cl.font = { bold: true, size: 10 }; cl.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; });
-    for (let c = 9; c <= 15; c++) ws.getCell(9, c).border = borda; ws.getRow(9).height = 30;
-    const H = ['Nome ou Iniciais do usuário', 'Município', 'Data de Nascimento DD/MM/AA', 'Sexo (M/F)', '*Condição para tratamento (1, 2, 3 ou 4)', 'Se gestante, insira a Idade Gestacional', 'Nº da Notificação no SINAN', 'Data da dispensação (DD/MM/AA)',
-      'Pirimetamina', 'Sulfadiazina', 'Espiramicina', 'Ac. Folínico', 'Pirimetamina', 'Sulfadiazina', 'Espiramicina'];
-    const hr = ws.getRow(10); hr.values = H; hr.height = 112;
-    hr.eachCell((cl, n) => { cl.font = { bold: true, size: 10 }; cl.border = borda; cl.alignment = n === 1 ? { horizontal: 'center', vertical: 'middle', wrapText: true } : { textRotation: 90, horizontal: 'center', vertical: 'middle', wrapText: true }; });
-    // linhas: uma por dispensação no período
-    const ds = D.toxo_dispensacoes.filter(d => d.municipio === mu && meses.includes((d.data || '').slice(0, 7)));
-    const pac = id => D.toxo_pacientes.find(p => p.id === id) || {};
-    ds.sort((a, b) => (pac(a.paciente_id).nome || '').localeCompare(pac(b.paciente_id).nome || '') || a.data.localeCompare(b.data));
-    let r = 11; const vistos = new Set();
-    if (!ds.length) { ws.mergeCells(`A${r}:O${r}`); ws.getCell(`A${r}`).value = 'SEM DISPENSAÇÕES NO PERÍODO'; ws.getCell(`A${r}`).alignment = { horizontal: 'center' }; ws.getCell(`A${r}`).border = borda; r++; }
+  const ws = wb.addWorksheet('Prestação de contas', { pageSetup: { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: .3, right: .3, top: .4, bottom: .4, header: .2, footer: .2 } } });
+  ws.columns = [30, 14, 11, 6, 11, 11, 12, 12, 8, 8, 8, 8, 8, 8, 8].map(w => ({ width: w }));
+  const linha = (r, estilo) => { for (let c = 1; c <= 15; c++) { const cl = ws.getCell(r, c); cl.border = borda; cl.font = { size: 10, ...(estilo || {}) }; if (cl.value instanceof Date) cl.numFmt = 'dd/mm/yy'; if (c >= 3) cl.alignment = { horizontal: 'center' }; } };
+  // cabeçalho com os brasões
+  ws.mergeCells('A1:B5'); ws.mergeCells('C1:L5'); ws.mergeCells('M1:O5');
+  const cab = ws.getCell('C1'); cab.value = 'SECRETARIA DE ESTADO DE SAÚDE PÚBLICA\nDIVISÃO DE VIGILÂNCIA EM SAÚDE\n8º CENTRO REGIONAL DE SAÚDE\nRELATÓRIO DE DISTRIBUIÇÃO DE MEDICAMENTO PARA TOXOPLASMOSE';
+  cab.font = { bold: true, size: 11 }; cab.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  for (let r = 1; r <= 5; r++) { ws.getRow(r).height = 17; for (let c = 1; c <= 15; c++) { const b = {};
+    if (r === 1) b.top = grosso; if (r === 5) b.bottom = grosso; if (c === 1 || c === 3 || c === 13) b.left = grosso; if (c === 2 || c === 12 || c === 15) b.right = grosso; ws.getCell(r, c).border = b; } }
+  ws.addImage(imgPA, { tl: { col: 0.75, row: 0.15 }, ext: { width: 78, height: 78 } });
+  ws.addImage(imgSE, { tl: { col: 12.9, row: 0.15 }, ext: { width: 66, height: 79 } });
+  ws.getCell('A7').value = 'UF: PARÁ'; ws.getCell('C7').value = 'PERÍODO: ' + periodo; ws.getCell('I7').value = 'REGIONAL: 8º CRS – MARAJÓ II'; ws.getCell('M7').value = 'MUNICÍPIO: ' + (mun || 'TODOS');
+  ['A7', 'C7', 'I7', 'M7'].forEach(c => ws.getCell(c).font = { bold: true, size: 10 });
+  // cabeçalho da tabela
+  ws.mergeCells('I9:L9'); ws.mergeCells('M9:O9');
+  ws.getCell('I9').value = 'Unidades dispensadas'; ws.getCell('M9').value = 'Consumo médio mensal no período';
+  ['I9', 'M9'].forEach(c => { const cl = ws.getCell(c); cl.font = { bold: true, size: 10 }; cl.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; });
+  for (let c = 9; c <= 15; c++) ws.getCell(9, c).border = borda; ws.getRow(9).height = 30;
+  const hr = ws.getRow(10); hr.values = ['Nome ou Iniciais do usuário', 'Município', 'Data de Nascimento DD/MM/AA', 'Sexo (M/F)', '*Condição para tratamento (1, 2, 3 ou 4)', 'Se gestante, insira a Idade Gestacional', 'Nº da Notificação no SINAN', 'Data da dispensação (DD/MM/AA)',
+    'Pirimetamina', 'Sulfadiazina', 'Espiramicina', 'Ac. Folínico', 'Pirimetamina', 'Sulfadiazina', 'Espiramicina']; hr.height = 112;
+  hr.eachCell((cl, n) => { cl.font = { bold: true, size: 10 }; cl.border = borda; cl.alignment = n === 1 ? { horizontal: 'center', vertical: 'middle', wrapText: true } : { textRotation: 90, horizontal: 'center', vertical: 'middle', wrapText: true }; });
+  // dispensações do trimestre, município por município
+  const pac = id => D.toxo_pacientes.find(p => p.id === id) || {};
+  const todas = D.toxo_dispensacoes.filter(d => muns.includes(d.municipio) && meses.includes((d.data || '').slice(0, 7)));
+  const somaK = (rs, k) => rs.reduce((s, x) => s + (+x[k] || 0), 0);
+  let r = 11;
+  if (!todas.length) { ws.mergeCells(`A${r}:O${r}`); ws.getCell(`A${r}`).value = 'SEM DISPENSAÇÕES NO TRIMESTRE'; ws.getCell(`A${r}`).alignment = { horizontal: 'center' }; ws.getCell(`A${r}`).border = borda; r++; }
+  for (const mu of muns) {
+    const ds = todas.filter(d => d.municipio === mu).sort((a, b) => (pac(a.paciente_id).nome || '').localeCompare(pac(b.paciente_id).nome || '') || a.data.localeCompare(b.data));
+    if (!ds.length) continue;
+    const vistos = new Set();
     for (const d of ds) {
       const p = pac(d.paciente_id), primeira = !vistos.has(p.id); vistos.add(p.id);
-      const tot = k => ds.filter(x => x.paciente_id === p.id).reduce((s, x) => s + (+x[k] || 0), 0), cm = k => primeira && tot(k) ? Math.round(tot(k) / nM * 10) / 10 : null;
+      const tot = k => somaK(ds.filter(x => x.paciente_id === p.id), k), cm = k => primeira && tot(k) ? Math.round(tot(k) / nM * 10) / 10 : null;
       ws.getRow(r).values = [p.nome, mu, dt(p.nascimento), p.sexo, p.condicao ? (p.condicao == 2 || p.condicao == 4 ? `${p.condicao} (${p.cid || ''})` : p.condicao) : null, p.condicao == 1 ? p.ig : null, p.nnotif, dt(d.data),
         d.pir, d.sul, d.esp, d.acf, cm('pir'), cm('sul'), cm('esp')].map(v => v ?? null);
-      for (let c = 1; c <= 15; c++) { const cl = ws.getCell(r, c); cl.border = borda; cl.font = { size: 10 }; if (cl.value instanceof Date) cl.numFmt = 'dd/mm/yy'; if (c >= 3) cl.alignment = { horizontal: 'center' }; }
-      r++;
+      linha(r); r++;
     }
-    if (ds.length) { ws.getCell(`A${r}`).value = 'TOTAL'; ['pir', 'sul', 'esp', 'acf'].forEach((k, i) => ws.getCell(r, 9 + i).value = ds.reduce((s, x) => s + (+x[k] || 0), 0));
-      for (let c = 1; c <= 15; c++) { const cl = ws.getCell(r, c); cl.border = borda; cl.font = { bold: true, size: 10 }; if (c >= 3) cl.alignment = { horizontal: 'center' }; } r++; }
-    // responsável e legenda
-    const ests = D.toxo_estoque.filter(e => e.municipio === mu && e.periodo === tri), ultE = ests[0];
-    r += 1; ws.getCell(`A${r}`).value = 'Responsável pelo preenchimento: ' + (ultE && ultE.responsavel ? ultE.responsavel : ''); ws.getCell(`A${r}`).font = { size: 11 };
-    r += 2; ws.mergeCells(`A${r}:O${r}`); const lg = ws.getCell(`A${r}`); lg.value = LEGENDA_TOXO; lg.font = { italic: true, size: 10 }; lg.alignment = { wrapText: true }; ws.getRow(r).height = 30;
-    // estoque
-    r += 2; ws.getCell(`A${r}`).value = `ESTOQUE DE MEDICAÇÃO – ${tri.slice(6)}º TRIMESTRE/${tri.slice(0, 4)}`; ws.getCell(`A${r}`).font = { bold: true, size: 12 };
-    r += 2; const cinza = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBFBFBF' } };
-    ws.mergeCells(`D${r}:F${r}`); ws.mergeCells(`G${r}:H${r}`);
+    if (muns.length > 1) { ws.getCell(`A${r}`).value = 'Subtotal ' + mu; ['pir', 'sul', 'esp', 'acf'].forEach((k, i) => ws.getCell(r, 9 + i).value = somaK(ds, k)); linha(r, { bold: true }); for (let c = 1; c <= 15; c++) ws.getCell(r, c).fill = claro; r++; }
+  }
+  if (todas.length) { ws.getCell(`A${r}`).value = muns.length > 1 ? 'TOTAL 8º CRS' : 'TOTAL'; ['pir', 'sul', 'esp', 'acf'].forEach((k, i) => ws.getCell(r, 9 + i).value = somaK(todas, k)); linha(r, { bold: true }); r++; }
+  // responsáveis e legenda
+  const estDe = mu => D.toxo_estoque.find(e => e.municipio === mu && e.periodo === tri);
+  r += 1;
+  if (muns.length === 1) { ws.getCell(`A${r}`).value = 'Responsável pelo preenchimento: ' + ((estDe(muns[0]) || {}).responsavel || ''); r++; }
+  else { ws.getCell(`A${r}`).value = 'Responsáveis pelo preenchimento:'; ws.getCell(`A${r}`).font = { bold: true }; r++;
+    for (const mu of muns) { ws.getCell(`A${r}`).value = `${mu}: ${(estDe(mu) || {}).responsavel || 'prestação de contas não enviada'}`; r++; } }
+  r += 1; ws.mergeCells(`A${r}:O${r}`); const lg = ws.getCell(`A${r}`); lg.value = LEGENDA_TOXO; lg.font = { italic: true, size: 10 }; lg.alignment = { wrapText: true }; ws.getRow(r).height = 30;
+  // estoque por município
+  r += 2; ws.getCell(`A${r}`).value = `ESTOQUE DE MEDICAÇÃO – ${tri.slice(6)}º TRIMESTRE/${tri.slice(0, 4)}`; ws.getCell(`A${r}`).font = { bold: true, size: 12 };
+  r += 2;
+  const cabEst = () => { ws.mergeCells(`D${r}:F${r}`); ws.mergeCells(`G${r}:H${r}`);
     [['A', ''], ['B', 'RECEBIDO'], ['C', 'SALDO ATUAL'], ['D', 'LOTE'], ['G', 'VALIDADE']].forEach(([c, v]) => { const cl = ws.getCell(`${c}${r}`); cl.value = v; cl.font = { bold: true, size: 10 }; cl.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; if (c !== 'A') cl.fill = cinza; });
-    for (let c = 1; c <= 8; c++) ws.getCell(r, c).border = borda; ws.getRow(r).height = 28; r++;
-    for (const k of EST_ORDEM) {
-      const rec = ests.reduce((s, e) => s + (+(e.itens[k] || {}).recebido || 0), 0), it = ultE ? (ultE.itens[k] || {}) : {};
-      ws.mergeCells(`D${r}:F${r}`); ws.mergeCells(`G${r}:H${r}`);
-      ws.getCell(`A${r}`).value = TMED.find(x => x[0] === k)[2]; ws.getCell(`A${r}`).font = { bold: true, size: 10 }; ws.getCell(`A${r}`).fill = cinza;
-      ws.getCell(`B${r}`).value = ests.length ? rec : null; ws.getCell(`C${r}`).value = it.saldo ?? null; ws.getCell(`D${r}`).value = it.lote || null;
-      ws.getCell(`G${r}`).value = dt(it.validade); if (it.validade) ws.getCell(`G${r}`).numFmt = 'dd/mm/yyyy';
-      for (let c = 1; c <= 8; c++) { const cl = ws.getCell(r, c); cl.border = borda; if (c > 1) cl.alignment = { horizontal: 'center' }; }
-      r++;
-    }
+    for (let c = 1; c <= 8; c++) ws.getCell(r, c).border = borda; ws.getRow(r).height = 28; r++; };
+  const linhaEst = (nome, rec, sal, lote, val, negrito) => { ws.mergeCells(`D${r}:F${r}`); ws.mergeCells(`G${r}:H${r}`);
+    ws.getCell(`A${r}`).value = nome; ws.getCell(`A${r}`).font = { bold: true, size: 10 }; ws.getCell(`A${r}`).fill = cinza;
+    ws.getCell(`B${r}`).value = rec ?? null; ws.getCell(`C${r}`).value = sal ?? null; ws.getCell(`D${r}`).value = lote || null; ws.getCell(`G${r}`).value = dt(val); if (val) ws.getCell(`G${r}`).numFmt = 'dd/mm/yyyy';
+    for (let c = 1; c <= 8; c++) { const cl = ws.getCell(r, c); cl.border = borda; if (c > 1) { cl.alignment = { horizontal: 'center' }; if (negrito) cl.font = { bold: true, size: 10 }; } } r++; };
+  cabEst();
+  for (const mu of muns) {
+    const e = estDe(mu);
+    if (muns.length > 1) { ws.mergeCells(`A${r}:H${r}`); const cl = ws.getCell(`A${r}`); cl.value = mu + (e ? '' : ' — prestação de contas não enviada'); cl.font = { bold: true, size: 10 }; cl.fill = claro; cl.border = borda; r++; }
+    for (const k of EST_ORDEM) { const it = e ? (e.itens[k] || {}) : {}; linhaEst(TMED.find(x => x[0] === k)[2], it.recebido, it.saldo, it.lote, it.validade); }
+  }
+  if (muns.length > 1) {
+    ws.mergeCells(`A${r}:H${r}`); const cl = ws.getCell(`A${r}`); cl.value = 'TOTAL 8º CRS (municípios que enviaram)'; cl.font = { bold: true, size: 10 }; cl.fill = claro; cl.border = borda; r++;
+    for (const k of EST_ORDEM) { const es = muns.map(estDe).filter(Boolean), sm = f => es.reduce((s, e) => s + (+(e.itens[k] || {})[f] || 0), 0);
+      linhaEst(TMED.find(x => x[0] === k)[2], es.length ? sm('recebido') : null, es.length ? sm('saldo') : null, null, null, true); }
   }
   const buf = await wb.xlsx.writeBuffer();
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-  a.download = `Prestacao_Toxoplasmose_${mun ? norm(mun).replace(/ /g, '_') : '8CRS'}_${tri.slice(6)}tri${tri.slice(0, 4)}.xlsx`; document.body.append(a); a.click(); a.remove();
+  a.download = `Prestacao_Toxoplasmose_${mun ? norm(mun).replace(/ /g, '_') : '8CRS_todos'}_${tri.slice(6)}tri${tri.slice(0, 4)}.xlsx`; document.body.append(a); a.click(); a.remove();
   if (DEMO) toast('No modo demonstração dentro do Claude o download pode ser bloqueado. No site publicado funciona.');
 }
 
